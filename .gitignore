@@ -1,0 +1,13 @@
+.direnv/
+node_modules/
+dist/
+public/
+coverage/
+playwright-report/
+test-results/
+*.db
+*.db-shm
+*.db-wal
+.env
+.env.*
+!.env.example
