@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
 import { getAdminToken } from '../api/client.ts'
 import { Layout } from '../components/Layout.tsx'
+import { ToastProvider } from '../components/toast.tsx'
 import { LoginPage } from '../features/auth/LoginPage.tsx'
 import { NodesPage } from '../features/nodes/NodesPage.tsx'
 import { ProfileDetailPage, ProfilesPage } from '../features/profiles/ProfilesPage.tsx'
@@ -16,7 +17,13 @@ const queryClient = new QueryClient({
 })
 
 export function App() {
-  return <QueryClientProvider client={queryClient}><BrowserRouter><AuthRouter /></BrowserRouter></QueryClientProvider>
+  return <ToastProvider>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthRouter />
+      </BrowserRouter>
+    </QueryClientProvider>
+  </ToastProvider>
 }
 
 function AuthRouter() {

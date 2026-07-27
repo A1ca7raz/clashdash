@@ -10,6 +10,7 @@ import type { RuleProvider } from '../domain/models/rule-provider.ts'
 import type { Rule, RulePack } from '../domain/models/rule.ts'
 import { handleHttpError } from './errors.ts'
 import { adminAuth } from './middleware/admin-auth.ts'
+import { requestLogger, requestPath, type HttpRequestLog } from './middleware/request-logger.ts'
 
 const id = z.string().trim().min(1)
 const jsonValue: z.ZodType<unknown> = z.lazy(() => z.union([
@@ -20,11 +21,22 @@ const credentials = z.object({ username: z.string(), password: z.string(), totpC
 const ruleSchema = z.object({
   type: z.string(), parameters: z.array(z.string()), policy: z.string(), modifiers: z.array(z.string()).optional(),
 })
-export type CreateAppOptions = { cronSecret?: string | undefined }
+export type CreateAppOptions = {
+  cronSecret?: string | undefined
+  logRequest?: (entry: HttpRequestLog) => void
+  logUnexpectedError?: (cause: unknown, method: string, path: string) => void
+}
 
 export function createApp(services?: ApplicationServices, options: CreateAppOptions = {}): Hono {
   const app = new Hono()
-  app.onError(handleHttpError)
+  if (options.logRequest) app.use('*', requestLogger(options.logRequest))
+  app.onError((cause, context) => {
+    const response = handleHttpError(cause, context)
+    if (response.status >= 500) {
+      options.logUnexpectedError?.(cause, context.req.method, requestPath(context.req.url))
+    }
+    return response
+  })
   app.get('/api/health', (context) => context.json({ status: 'ok' }))
   if (!services) return app
 
@@ -39,6 +51,11 @@ export function createApp(services?: ApplicationServices, options: CreateAppOpti
     context.header('content-disposition', `attachment; filename="${safeFilename(result.profileName)}.yaml"`)
     context.header('cache-control', 'no-store')
     return context.body(result.yaml)
+  })
+  app.get('/api/profile/version', async (context) => {
+    const result = await services.subscriptions.updateInfo(context.req.query('apikey') ?? '')
+    context.header('cache-control', 'no-store')
+    return context.json(result)
   })
   app.post('/api/cron/providers/refresh', async (context) => {
     if (!options.cronSecret) return context.json({ error: { code: 'NOT_FOUND', message: 'Route not found' } }, 404)

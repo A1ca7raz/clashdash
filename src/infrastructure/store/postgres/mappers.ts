@@ -1,7 +1,7 @@
 import type { JsonObject, JsonValue } from '../../../domain/json.ts'
 import type { Node, ProviderNode, UserDefinedNode } from '../../../domain/models/node.ts'
 import type { MissingProfileReference, Profile, ResolvedProfile } from '../../../domain/models/profile.ts'
-import type { ProviderOverride, ProxyProvider } from '../../../domain/models/provider.ts'
+import type { ProviderHeaders, ProviderOverride, ProxyProvider } from '../../../domain/models/provider.ts'
 import type { RuleProvider } from '../../../domain/models/rule-provider.ts'
 import type { Rule, RulePack } from '../../../domain/models/rule.ts'
 import {
@@ -17,7 +17,8 @@ import {
   type ProviderRow,
 } from '../sqlite/mappers.ts'
 
-export type PostgresProviderRow = Omit<ProviderRow, 'override_json' | 'config_json'> & {
+export type PostgresProviderRow = Omit<ProviderRow, 'headers_json' | 'override_json' | 'config_json'> & {
+  headers_json: ProviderHeaders | null
   override_json: ProviderOverride | null
   config_json: JsonObject | null
 }
@@ -47,6 +48,7 @@ export function providerToPostgresRow(provider: ProxyProvider): PostgresProvider
   const row = providerToRow(provider)
   return {
     ...row,
+    headers_json: row.headers_json === null ? null : JSON.parse(row.headers_json) as ProviderHeaders,
     override_json: row.override_json === null ? null : JSON.parse(row.override_json) as ProviderOverride,
     config_json: row.config_json === null ? null : JSON.parse(row.config_json) as JsonObject,
   }
@@ -55,6 +57,7 @@ export function providerToPostgresRow(provider: ProxyProvider): PostgresProvider
 export function postgresRowToProvider(row: PostgresProviderRow): ProxyProvider {
   return rowToProvider({
     ...row,
+    headers_json: row.headers_json === null ? null : JSON.stringify(row.headers_json),
     override_json: row.override_json === null ? null : JSON.stringify(row.override_json),
     config_json: row.config_json === null ? null : JSON.stringify(row.config_json),
   })

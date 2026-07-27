@@ -3,6 +3,7 @@ import Database from 'better-sqlite3'
 import { ConflictError, NotFoundError, ValidationError } from '../../../application/errors.ts'
 import type {
   AppStore,
+  ProfileUpdateInfo,
   ProviderNodeState,
   StoredSubscriptionToken,
 } from '../../../application/ports/app-store.ts'
@@ -44,6 +45,7 @@ type SubscriptionTokenRow = {
   token_hash: string
   encrypted_token: string
 }
+type ProfileUpdateInfoRow = { version: number; update_time: number }
 
 export class SqliteStore implements AppStore {
   readonly database: Database.Database
@@ -118,15 +120,16 @@ export class SqliteStore implements AppStore {
       this.runWithConflict(() => this.database.prepare(`
         INSERT INTO providers (
           id, type, name, url, interval, subscription_format, filter, exclude_filter,
-          exclude_type, override_json, config_json
+          exclude_type, user_agent, headers_json, override_json, config_json
         ) VALUES (
           @id, @type, @name, @url, @interval, @subscription_format, @filter, @exclude_filter,
-          @exclude_type, @override_json, @config_json
+          @exclude_type, @user_agent, @headers_json, @override_json, @config_json
         )
         ON CONFLICT(id) DO UPDATE SET
           type = excluded.type, name = excluded.name, url = excluded.url, interval = excluded.interval,
           subscription_format = excluded.subscription_format, filter = excluded.filter,
           exclude_filter = excluded.exclude_filter, exclude_type = excluded.exclude_type,
+          user_agent = excluded.user_agent, headers_json = excluded.headers_json,
           override_json = excluded.override_json, config_json = excluded.config_json
       `).run(row))
       if (provider.type === 'passthrough') {
@@ -255,6 +258,13 @@ export class SqliteStore implements AppStore {
     ))
   }
 
+  getProfileUpdateInfo(id: string): ProfileUpdateInfo | undefined {
+    const row = this.database.prepare(`
+      SELECT version, update_time FROM profiles WHERE id = ?
+    `).get(id) as ProfileUpdateInfoRow | undefined
+    return row ? { version: row.version, updateTime: row.update_time } : undefined
+  }
+
   private removeMissingProfileReferences(value: ResolvedProfile): ResolvedProfile {
     if (value.missingReferences.length === 0) return value
     this.saveProfile(value.profile)
@@ -267,11 +277,11 @@ export class SqliteStore implements AppStore {
       INSERT INTO profiles (
         id, name, tags_json, note, general_config_json, selected_node_ids_json,
         listeners_json, proxy_groups_json, rule_entries_json, passthrough_provider_ids_json
-        , rule_provider_ids_json
+        , rule_provider_ids_json, version, update_time
       ) VALUES (
         @id, @name, @tags_json, @note, @general_config_json, @selected_node_ids_json,
         @listeners_json, @proxy_groups_json, @rule_entries_json, @passthrough_provider_ids_json,
-        @rule_provider_ids_json
+        @rule_provider_ids_json, 1, unixepoch()
       )
       ON CONFLICT(id) DO UPDATE SET
         name = excluded.name, tags_json = excluded.tags_json, note = excluded.note,
@@ -280,7 +290,9 @@ export class SqliteStore implements AppStore {
         listeners_json = excluded.listeners_json, proxy_groups_json = excluded.proxy_groups_json,
         rule_entries_json = excluded.rule_entries_json,
         rule_provider_ids_json = excluded.rule_provider_ids_json,
-        passthrough_provider_ids_json = excluded.passthrough_provider_ids_json
+        passthrough_provider_ids_json = excluded.passthrough_provider_ids_json,
+        version = profiles.version + 1,
+        update_time = unixepoch()
     `).run(row)
   }
 
@@ -402,7 +414,9 @@ export class SqliteStore implements AppStore {
         : entry)
       const rewrittenSelected = selected.map((entry) => entry.id === id ? { ...entry, displayName: newName } : entry)
       this.database.prepare(`
-        UPDATE profiles SET rule_entries_json = ?, rule_provider_ids_json = ? WHERE id = ?
+        UPDATE profiles SET rule_entries_json = ?, rule_provider_ids_json = ?,
+          version = version + 1, update_time = unixepoch()
+        WHERE id = ?
       `).run(encodeJson(rewrittenEntries), encodeJson(rewrittenSelected), row.id)
     }
   }

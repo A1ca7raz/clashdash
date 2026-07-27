@@ -80,5 +80,13 @@ describe('application services', () => {
     expect((await subscriptions.get(issued.id)).token).toBe(issued.token)
     expect((await subscriptions.list('profile-1'))[0]?.token).toBe(issued.token)
     expect((await subscriptions.render(issued.token)).yaml).toContain('MATCH,DIRECT')
+    const initialInfo = await subscriptions.updateInfo(issued.token)
+    expect(initialInfo).toMatchObject({ version: 1, updateTime: expect.any(Number) })
+    await profiles.save({ ...issued.profile, note: 'updated' })
+    await expect(subscriptions.updateInfo(issued.token)).resolves.toMatchObject({
+      version: 2,
+      updateTime: expect.any(Number),
+    })
+    await expect(subscriptions.updateInfo('invalid')).rejects.toThrow('Subscription token not found')
   })
 })

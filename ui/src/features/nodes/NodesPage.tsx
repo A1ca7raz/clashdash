@@ -1,14 +1,19 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { stringify } from 'yaml'
 
-import type { ProxyProvider } from '../../../../src/domain/models/provider.ts'
+import type {
+  ImportProvider,
+  PassthroughProvider,
+  ProxyProvider,
+} from '../../../../src/domain/models/provider.ts'
+import { parseProviderHeaders, renderProviderHeaders } from '../../../../src/domain/providers/provider-headers.ts'
 import { parseProviderOverride, renderProviderOverride } from '../../../../src/domain/providers/provider-transform.ts'
 import { parseSubscription } from '../../../../src/shared/subscription-parser/index.ts'
 import { api, post, put, remove } from '../../api/client.ts'
 import { Badge, Button, Dialog, Empty, ErrorNotice, Field, YamlEditor } from '../../components/ui.tsx'
 import { PageHeader } from '../../components/Layout.tsx'
-import { parseYamlObject } from '../../lib/yaml.ts'
+import { parseOptionalYamlObject, parseYamlObject, stringifyYamlObject } from '../../lib/yaml.ts'
 
 type UserDefinedNodeItem = {
   type: 'userdefined'; id: string; name: string; tags: string[]
@@ -151,31 +156,147 @@ function ProviderDialog({ value, onClose, onDone }: { value?: ProxyProvider; onC
   const [type, setType] = useState<'import' | 'passthrough'>(value?.type ?? 'import')
   const [name, setName] = useState(value?.name ?? '')
   const [url, setUrl] = useState(value?.url ?? '')
-  const [interval, setIntervalValue] = useState(value?.interval ?? 3600)
+  const [interval, setInterval] = useState(value?.interval ?? 3600)
   const [format, setFormat] = useState<'clash' | 'uri' | 'base64'>(value?.type === 'import' ? value.subscriptionFormat : 'clash')
   const [filter, setFilter] = useState(value?.filter ?? '')
   const [excludeFilter, setExcludeFilter] = useState(value?.excludeFilter ?? '')
   const [excludeType, setExcludeType] = useState(value?.excludeType ?? '')
-  const [override, setOverride] = useState(() => stringify(renderProviderOverride(value?.override ?? {}), { lineWidth: 0 }))
-  const [config, setConfig] = useState(() => stringify(value?.type === 'passthrough' ? value.config : {}, { lineWidth: 0 }))
-  const mutation = useMutation({ mutationFn: () => {
-    const body = {
-    type, name, url, interval,
-    ...(filter ? { filter } : {}), ...(excludeFilter ? { excludeFilter } : {}), ...(excludeType ? { excludeType } : {}),
-    override: parseProviderOverride(parseYamlObject(override, 'Override')),
-    ...(type === 'import' ? { subscriptionFormat: format } : { config: parseYamlObject(config, 'Provider config') }),
+  const [userAgent, setUserAgent] = useState(value?.type === 'import' ? value.userAgent ?? '' : '')
+  const [headersYaml, setHeadersYaml] = useState(() => stringifyYamlObject(
+    value?.type === 'import' && value.headers ? renderProviderHeaders(value.headers) : undefined,
+  ))
+  const [overrideYaml, setOverrideYaml] = useState(() => stringifyYamlObject(
+    value?.override ? renderProviderOverride(value.override) : undefined,
+  ))
+  const [configYaml, setConfigYaml] = useState(() => stringifyYamlObject(
+    value?.type === 'passthrough' ? value.config : undefined,
+  ))
+  const mutation = useMutation({
+    mutationFn: () => {
+      const body = createProviderInput({
+        type,
+        name,
+        url,
+        interval,
+        format,
+        filter,
+        excludeFilter,
+        excludeType,
+        userAgent,
+        headersYaml,
+        overrideYaml,
+        configYaml,
+      })
+      return value ? put(`/api/providers/${value.id}`, body) : post('/api/providers', body)
+    },
+    onSuccess: onDone,
+  })
+
+  return <Dialog title={value ? '编辑订阅' : '新建 Provider'} onClose={onClose}>
+    <form onSubmit={(event) => { event.preventDefault(); mutation.mutate() }}>
+      <ErrorNotice error={mutation.error} />
+      <div className="form-grid three">
+        <Field label="模式">
+          <select value={type} onChange={(event) => setType(event.target.value as typeof type)}>
+            <option value="import">Import · 拉取并解析</option>
+            <option value="passthrough">Passthrough · 客户端拉取</option>
+          </select>
+        </Field>
+        <Field label="名称">
+          <input required value={name} onChange={(event) => setName(event.target.value)} />
+        </Field>
+        <Field label="刷新间隔（秒）">
+          <input type="number" min={1} value={interval} onChange={(event) => setInterval(Number(event.target.value))} />
+        </Field>
+      </div>
+      <Field label="URL">
+        <input type="url" required value={url} onChange={(event) => setUrl(event.target.value)} />
+      </Field>
+      {type === 'import' && <>
+        <div className="form-grid">
+          <Field label="订阅格式">
+            <select value={format} onChange={(event) => setFormat(event.target.value as typeof format)}>
+              <option value="clash">Clash</option>
+              <option value="uri">URI</option>
+              <option value="base64">Base64</option>
+            </select>
+          </Field>
+          <Field label="User-Agent">
+            <input value={userAgent} onChange={(event) => setUserAgent(event.target.value)} placeholder="clash.meta" />
+          </Field>
+        </div>
+        <Field label="Header YAML（Mihomo 格式）">
+          <YamlEditor value={headersYaml} onChange={setHeadersYaml} rows={5} />
+        </Field>
+      </>}
+      <div className="form-grid three">
+        <Field label="Filter"><input value={filter} onChange={(event) => setFilter(event.target.value)} /></Field>
+        <Field label="Exclude Filter">
+          <input value={excludeFilter} onChange={(event) => setExcludeFilter(event.target.value)} />
+        </Field>
+        <Field label="Exclude Type">
+          <input value={excludeType} onChange={(event) => setExcludeType(event.target.value)} placeholder="ss|http" />
+        </Field>
+      </div>
+      <Field label="Override YAML（Mihomo 字段）">
+        <YamlEditor value={overrideYaml} onChange={setOverrideYaml} rows={7} />
+      </Field>
+      {type === 'passthrough' && <Field label="额外 Provider config YAML">
+        <YamlEditor value={configYaml} onChange={setConfigYaml} rows={5} />
+      </Field>}
+      <div className="dialog-actions">
+        <Button type="button" variant="quiet" onClick={onClose}>取消</Button>
+        <Button disabled={mutation.isPending}>{value ? '保存修改' : '保存 Provider'}</Button>
+      </div>
+    </form>
+  </Dialog>
+}
+
+type ProviderFormValues = {
+  type: ProxyProvider['type']
+  name: string
+  url: string
+  interval: number
+  format: ImportProvider['subscriptionFormat']
+  filter: string
+  excludeFilter: string
+  excludeType: string
+  userAgent: string
+  headersYaml: string
+  overrideYaml: string
+  configYaml: string
+}
+
+type CreateProviderInput = Omit<ImportProvider, 'id'> | Omit<PassthroughProvider, 'id'>
+
+function createProviderInput(values: ProviderFormValues): CreateProviderInput {
+  const override = parseOptionalYamlObject(values.overrideYaml, 'Override')
+  const common = {
+    name: values.name,
+    url: values.url,
+    interval: values.interval,
+    ...(values.filter ? { filter: values.filter } : {}),
+    ...(values.excludeFilter ? { excludeFilter: values.excludeFilter } : {}),
+    ...(values.excludeType ? { excludeType: values.excludeType } : {}),
+    ...(override ? { override: parseProviderOverride(override) } : {}),
+  }
+
+  if (values.type === 'passthrough') {
+    return {
+      type: 'passthrough',
+      ...common,
+      config: parseYamlObject(values.configYaml, 'Provider config'),
     }
-    return value ? put(`/api/providers/${value.id}`, body) : post('/api/providers', body)
-  }, onSuccess: onDone })
-  return <Dialog title={value ? '编辑订阅' : '新建 Provider'} onClose={onClose}><form onSubmit={(e) => { e.preventDefault(); mutation.mutate() }}>
-    <ErrorNotice error={mutation.error} /><div className="form-grid three"><Field label="模式"><select value={type} onChange={(e) => setType(e.target.value as typeof type)}><option value="import">Import · 拉取并解析</option><option value="passthrough">Passthrough · 客户端拉取</option></select></Field><Field label="名称"><input required value={name} onChange={(e) => setName(e.target.value)} /></Field><Field label="刷新间隔（秒）"><input type="number" min={1} value={interval} onChange={(e) => setIntervalValue(Number(e.target.value))} /></Field></div>
-    <Field label="URL"><input type="url" required value={url} onChange={(e) => setUrl(e.target.value)} /></Field>
-    {type === 'import' && <Field label="订阅格式"><select value={format} onChange={(e) => setFormat(e.target.value as typeof format)}><option value="clash">Clash</option><option value="uri">URI</option><option value="base64">Base64</option></select></Field>}
-    <div className="form-grid three"><Field label="Filter"><input value={filter} onChange={(e) => setFilter(e.target.value)} /></Field><Field label="Exclude Filter"><input value={excludeFilter} onChange={(e) => setExcludeFilter(e.target.value)} /></Field><Field label="Exclude Type"><input value={excludeType} onChange={(e) => setExcludeType(e.target.value)} placeholder="ss|http" /></Field></div>
-    <Field label="Override YAML（Mihomo 字段）"><YamlEditor value={override} onChange={setOverride} rows={7} /></Field>
-    {type === 'passthrough' && <Field label="额外 Provider config YAML"><YamlEditor value={config} onChange={setConfig} rows={5} /></Field>}
-    <div className="dialog-actions"><Button type="button" variant="quiet" onClick={onClose}>取消</Button><Button disabled={mutation.isPending}>{value ? '保存修改' : '保存 Provider'}</Button></div>
-  </form></Dialog>
+  }
+
+  const headers = parseOptionalYamlObject(values.headersYaml, 'Header')
+  return {
+    type: 'import',
+    ...common,
+    subscriptionFormat: values.format,
+    ...(values.userAgent.trim() ? { userAgent: values.userAgent.trim() } : {}),
+    ...(headers ? { headers: parseProviderHeaders(headers) } : {}),
+  }
 }
 
 function splitTags(value: string): string[] { return value.split(',').map((item) => item.trim()).filter(Boolean) }

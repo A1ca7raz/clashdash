@@ -3,7 +3,7 @@ with pkgs; mkShell {
   packages = [
     nodejs
     corepack
-    chromium
     mihomo
+    openssl
   ];
 }

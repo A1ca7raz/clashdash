@@ -1,16 +1,24 @@
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { ValidationError } from '../errors.ts'
-import type { RemoteContentFetcher } from '../ports/remote-content-fetcher.ts'
+import type {
+  RemoteContentFetcher,
+  RemoteContentFetchOptions,
+} from '../ports/remote-content-fetcher.ts'
 import type { ImportProvider } from '../../domain/models/provider.ts'
 import { SubscriptionParserRegistry } from '../../shared/subscription-parser/index.ts'
 import { SqliteStore } from '../../infrastructure/store/sqlite/sqlite-store.ts'
 import { ProviderRefreshService } from './provider-refresh-service.ts'
+import type { ProviderRefreshLog } from './provider-refresh-service.ts'
 
 class MutableFetcher implements RemoteContentFetcher {
   content = ''
   error: Error | undefined
-  async fetch(): Promise<string> {
+  lastUrl: string | undefined
+  lastOptions: RemoteContentFetchOptions | undefined
+  async fetch(url: string, options?: RemoteContentFetchOptions): Promise<string> {
+    this.lastUrl = url
+    this.lastOptions = options
     if (this.error) throw this.error
     return this.content
   }
@@ -20,7 +28,12 @@ describe('ProviderRefreshService', () => {
   const stores: SqliteStore[] = []
   afterEach(() => { stores.splice(0).forEach((store) => store.close()) })
 
-  function setup(): { store: SqliteStore; fetcher: MutableFetcher; service: ProviderRefreshService; provider: ImportProvider } {
+  function setup(log?: (entry: ProviderRefreshLog) => void): {
+    store: SqliteStore
+    fetcher: MutableFetcher
+    service: ProviderRefreshService
+    provider: ImportProvider
+  } {
     const store = new SqliteStore()
     stores.push(store)
     const fetcher = new MutableFetcher()
@@ -29,7 +42,12 @@ describe('ProviderRefreshService', () => {
       subscriptionFormat: 'clash', filter: 'HK', override: { additionalPrefix: '[A] ', udp: true },
     }
     store.saveProvider(provider)
-    return { store, fetcher, service: new ProviderRefreshService(store, fetcher, new SubscriptionParserRegistry()), provider }
+    return {
+      store,
+      fetcher,
+      service: new ProviderRefreshService(store, fetcher, new SubscriptionParserRegistry(), { ...(log ? { log } : {}) }),
+      provider,
+    }
   }
 
   it('filters, overrides, and preserves a node id when its parameters change', async () => {
@@ -60,6 +78,45 @@ describe('ProviderRefreshService', () => {
     fetcher.content = 'proxies:\n  - name: broken'
     await expect(service.refresh(provider.id)).rejects.toBeInstanceOf(ValidationError)
     expect(store.listProviderNodeStates(provider.id)).toEqual(old)
+  })
+
+  it('passes custom request settings to the remote fetcher', async () => {
+    const { store, fetcher, service, provider } = setup()
+    const configured = {
+      ...provider,
+      userAgent: 'CustomClient/2.0',
+      headers: { Authorization: ['Bearer secret'], 'X-Client': ['ClashDash'] },
+    }
+    store.saveProvider(configured)
+    fetcher.content = clashSubscription('server-a.example')
+
+    await service.refresh(provider.id)
+
+    expect(fetcher.lastUrl).toBe(provider.url)
+    expect(fetcher.lastOptions).toEqual({
+      userAgent: 'CustomClient/2.0',
+      headers: { Authorization: ['Bearer secret'], 'X-Client': ['ClashDash'] },
+    })
+  })
+
+  it('logs successful and failed refreshes without request secrets', async () => {
+    const logs: ProviderRefreshLog[] = []
+    const { fetcher, service, provider } = setup((entry) => logs.push(entry))
+    fetcher.content = clashSubscription('server-a.example')
+
+    await service.refresh(provider.id)
+    fetcher.error = new Error('network down')
+    await expect(service.refresh(provider.id)).rejects.toThrow('network down')
+
+    expect(logs[0]).toMatchObject({
+      providerId: provider.id, status: 'succeeded', nodeCount: 1,
+    })
+    expect(logs[0]?.durationMs).toBeGreaterThanOrEqual(0)
+    expect(logs[1]).toMatchObject({
+      providerId: provider.id, status: 'failed', cause: fetcher.error,
+    })
+    expect(logs[1]?.durationMs).toBeGreaterThanOrEqual(0)
+    expect(JSON.stringify(logs)).not.toContain(provider.url)
   })
 })
 

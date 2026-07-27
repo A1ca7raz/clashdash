@@ -19,6 +19,7 @@ import { Rfc6238TotpService } from '../infrastructure/security/rfc6238-totp-serv
 import { ScryptPasswordHasher } from '../infrastructure/security/scrypt-password-hasher.ts'
 import { loadServerConfig, type ServerConfig } from './config.ts'
 import { openAppStore } from './open-app-store.ts'
+import { runtimeLogger } from './runtime-logger.ts'
 
 export type ServerContainer = {
   config: ServerConfig
@@ -31,7 +32,9 @@ export async function createServerContainer(environment: NodeJS.ProcessEnv = pro
   const store = await openAppStore(config)
 
   const parsers = new SubscriptionParserRegistry()
-  const refresh = new ProviderRefreshService(store, new NodeFetcher(), parsers)
+  const refresh = new ProviderRefreshService(store, new NodeFetcher(), parsers, {
+    log: (entry) => runtimeLogger.providerRefresh(entry),
+  })
   const scheduler: ProviderScheduler = config.mode === 'local'
     ? new NodeCronScheduler((providerId) => refresh.refresh(providerId))
     : new NoopScheduler()

@@ -10,8 +10,8 @@ import type { ProxyGroup } from '../../../../src/domain/models/proxy-group.ts'
 import type { RuleProvider } from '../../../../src/domain/models/rule-provider.ts'
 import type { RulePack } from '../../../../src/domain/models/rule.ts'
 import { api, post, put, remove } from '../../api/client.ts'
-import { Badge, Button, Dialog, Empty, ErrorNotice, Field } from '../../components/ui.tsx'
-import { parseYamlObject } from '../../lib/yaml.ts'
+import { Badge, Button, Dialog, Empty, ErrorNotice, Field, ToastMessage } from '../../components/ui.tsx'
+import { parseYamlObject, stringifyYamlObject } from '../../lib/yaml.ts'
 import { createRuleEditorItem, RuleListEditor, type RuleEditorItem } from '../rules/RuleListEditor.tsx'
 
 type Diagnostic = { severity: 'error' | 'warning'; code: string; message: string; location?: string }
@@ -26,7 +26,7 @@ export function ProfileEditor({ value, onChanged, onDeleted }: {
   const client = useQueryClient()
   const [name, setName] = useState(value.profile.name)
   const [tags, setTags] = useState(value.profile.tags.join(', '))
-  const [generalConfigYaml, setGeneralConfigYaml] = useState(() => stringify(value.profile.generalConfig, { lineWidth: 0 }))
+  const [generalConfigYaml, setGeneralConfigYaml] = useState(() => stringifyYamlObject(value.profile.generalConfig))
   const [ruleItems, setRuleItems] = useState<RuleEditorItem[]>(() => value.profile.ruleEntries.map(createRuleEditorItem))
   const [ruleProviders, setRuleProviders] = useState<RuleProvider[]>(() => structuredClone(value.profile.ruleProviders))
   const [selectedNodes, setSelectedNodes] = useState<Node[]>(() => structuredClone(value.profile.selectedNodes))
@@ -83,7 +83,7 @@ export function ProfileEditor({ value, onChanged, onDeleted }: {
       <div className="segmented"><button className={view === 'editor' ? 'active' : ''} onClick={() => setView('editor')}>结构化编辑</button><button className={view === 'preview' ? 'active' : ''} onClick={() => setView('preview')}>YAML 预览</button><button className={view === 'tokens' ? 'active' : ''} onClick={() => setView('tokens')}>订阅 Token</button></div>
     </header>
     <ErrorNotice error={editorError ?? save.error ?? compile.error ?? deletion.error ?? nodes.error ?? providerPool.error ?? rulePacks.error ?? ruleProviderPool.error} />
-    {saved && <div className="notice notice-success profile-save-notice">Profile 已保存。</div>}
+    {saved && <ToastMessage message="Profile 已保存。" tone="success" />}
     {view === 'editor' && <div className="profile-structured-editor">
       <BasicSection name={name} tags={tags} onNameChange={setName} onTagsChange={setTags} />
       <GeneralConfigSection value={generalConfigYaml} onChange={setGeneralConfigYaml} />
@@ -237,11 +237,49 @@ function ListenerEditDialog({ value, onSave, onClose }: {
 
 function ProxyGroupSection({ value, onChange }: { value: ProxyGroup[]; onChange(value: ProxyGroup[]): void }) {
   const [editing, setEditing] = useState<number | 'new'>()
-  return <EditorSection title="ProxyGroup 卡片组" detail="每张卡片保存一个原始 YAML 对象。" actions={<Button onClick={() => setEditing('new')}>＋ 创建 ProxyGroup</Button>}>
-    <div className="proxy-group-grid">{value.map((group, index) => <article key={`${group.name}-${index}`} className="proxy-group-card"><header><div><strong>{group.name}</strong><small>{group.type.toUpperCase()}</small></div></header><pre>{stringify(group, { lineWidth: 0 }).trim()}</pre><footer><Button variant="quiet" onClick={() => setEditing(index)}>编辑 YAML</Button><Button variant="danger" onClick={() => onChange(value.filter((_, position) => position !== index))}>删除</Button></footer></article>)}</div>
+  function save(group: ProxyGroup) {
+    if (editing === undefined) return
+    onChange(editing === 'new' ? [...value, group] : replaceAt(value, editing, group))
+    setEditing(undefined)
+  }
+
+  return <EditorSection
+    title="ProxyGroup 卡片组"
+    detail="Profile 中编译的策略组。"
+    actions={<Button onClick={() => setEditing('new')}>＋ 创建 ProxyGroup</Button>}
+  >
+    <div className="proxy-group-grid">
+      {value.map((group, index) => <ProxyGroupCard
+        key={`${group.name}-${index}`}
+        group={group}
+        onEdit={() => setEditing(index)}
+        onDelete={() => onChange(value.filter((_, position) => position !== index))}
+      />)}
+    </div>
     {value.length === 0 && <InlineEmpty text="尚未创建 ProxyGroup。" />}
-    {editing !== undefined && <ProxyGroupDialog {...(editing === 'new' ? {} : { value: value[editing] })} onSave={(group) => { onChange(editing === 'new' ? [...value, group] : value.map((current, index) => index === editing ? group : current)); setEditing(undefined) }} onClose={() => setEditing(undefined)} />}
+    {editing !== undefined && <ProxyGroupDialog
+      {...(editing === 'new' ? {} : { value: value[editing] })}
+      onSave={save}
+      onClose={() => setEditing(undefined)}
+    />}
   </EditorSection>
+}
+
+function ProxyGroupCard({ group, onEdit, onDelete }: {
+  group: ProxyGroup
+  onEdit(): void
+  onDelete(): void
+}) {
+  return <article className="proxy-group-card">
+    <div className="proxy-group-identity">
+      <strong>{group.name}</strong>
+      <small>{group.type.toUpperCase()}</small>
+    </div>
+    <div className="proxy-group-actions">
+      <Button variant="quiet" onClick={onEdit}>编辑</Button>
+      <Button variant="danger" onClick={onDelete}>删除</Button>
+    </div>
+  </article>
 }
 
 function ProxyGroupDialog({ value, onSave, onClose }: { value?: ProxyGroup; onSave(value: ProxyGroup): void; onClose(): void }) {
@@ -295,3 +333,6 @@ function TokensPanel({ profileId }: { profileId: string }) {
 
 function splitTags(value: string): string[] { return value.split(',').map((item) => item.trim()).filter(Boolean) }
 function upsertById<T extends { id: string }>(items: T[], value: T): T[] { return [...items.filter((item) => item.id !== value.id), value] }
+function replaceAt<T>(items: T[], index: number, value: T): T[] {
+  return items.map((item, position) => position === index ? value : item)
+}

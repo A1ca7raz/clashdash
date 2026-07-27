@@ -64,6 +64,15 @@ describe('SqliteStore', () => {
     expect(store.profileIdsReferencingNode(node.id)).toEqual([profile.id])
     expect(store.profileIdsReferencingProvider(provider.id)).toEqual([profile.id])
     expect(store.profileIdsReferencingRulePack(rulePack.id)).toEqual([profile.id])
+
+    const createdInfo = store.getProfileUpdateInfo(profile.id)
+    expect(createdInfo).toMatchObject({ version: 1 })
+    expect(createdInfo?.updateTime).toEqual(expect.any(Number))
+    store.saveProfile(profile)
+    expect(store.getProfileUpdateInfo(profile.id)).toMatchObject({
+      version: 2,
+      updateTime: expect.any(Number),
+    })
   })
 
   it('automatically removes missing references when a Profile is read', () => {
@@ -92,9 +101,11 @@ describe('SqliteStore', () => {
   it('replaces provider nodes atomically and cascades provider deletion', () => {
     const provider: ImportProvider = {
       type: 'import', id: 'import-1', name: 'Airport', url: 'https://example.com', interval: 3600,
-      subscriptionFormat: 'clash',
+      subscriptionFormat: 'clash', userAgent: 'CustomClient/2.0',
+      headers: { Authorization: ['Bearer secret'], 'X-Client': ['ClashDash'] },
     }
     store.saveProvider(provider)
+    expect(store.getProvider(provider.id)).toEqual(provider)
     store.replaceProviderNodes(provider.id, [{
       upstreamKey: 'upstream-a',
       node: { type: 'provider', id: 'node-a', name: 'A', tags: [], proxy: { type: 'ss' }, provider },
@@ -145,9 +156,11 @@ describe('SqliteStore', () => {
     store.saveRuleProvider(ruleProvider)
     store.saveRulePack(pack)
     store.saveProfile(profile)
+    expect(store.getProfileUpdateInfo(profile.id)?.version).toBe(1)
 
     const renamed = { ...ruleProvider, name: 'NewRules' }
     store.saveRuleProvider(renamed, ruleProvider.name)
+    expect(store.getProfileUpdateInfo(profile.id)?.version).toBe(2)
     expect(store.getRulePack(pack.id)?.rules[0]?.parameters).toEqual(['NewRules'])
     expect(store.getProfile(profile.id)?.profile).toMatchObject({
       ruleProviders: [{ id: ruleProvider.id, name: 'NewRules' }],

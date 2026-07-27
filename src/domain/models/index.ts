@@ -5,6 +5,7 @@ export type {
   ImportProvider,
   PassthroughProvider,
   ProviderBase,
+  ProviderHeaders,
   ProviderOverride,
   ProxyProvider,
 } from './provider.ts'

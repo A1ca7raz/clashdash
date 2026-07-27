@@ -18,6 +18,7 @@ import { SqliteStore } from '../infrastructure/store/sqlite/sqlite-store.ts'
 import { createApp } from './app.ts'
 import type { RuleProvider } from '../domain/models/rule-provider.ts'
 import type { RulePack } from '../domain/models/rule.ts'
+import type { ResolvedProfile } from '../domain/models/profile.ts'
 
 describe('HTTP app', () => {
   const stores: SqliteStore[] = []
@@ -130,6 +131,7 @@ describe('HTTP app', () => {
       }),
     })
     expect(profileResponse.status).toBe(201)
+    const createdProfile = await profileResponse.json() as ResolvedProfile
     const issue = await app.request('/api/profiles/profile-1/tokens', {
       method: 'POST', headers: adminHeaders, body: JSON.stringify({ note: 'phone' }),
     })
@@ -140,6 +142,23 @@ describe('HTTP app', () => {
     expect(subscriptionUrl.pathname).toBe('/api/profile')
     expect(subscriptionUrl.searchParams.get('apikey')).toBe(issued.token)
 
+    const initialVersionResponse = await app.request(`/api/profile/version?apikey=${issued.token}`)
+    expect(initialVersionResponse.status).toBe(200)
+    expect(initialVersionResponse.headers.get('cache-control')).toBe('no-store')
+    const initialVersion = await initialVersionResponse.json() as { version: number; updateTime: number }
+    expect(initialVersion).toMatchObject({ version: 1, updateTime: expect.any(Number) })
+
+    const updateProfile = await app.request('/api/profiles/profile-1', {
+      method: 'PUT', headers: adminHeaders,
+      body: JSON.stringify({ profile: { ...createdProfile.profile, note: 'updated' } }),
+    })
+    expect(updateProfile.status).toBe(200)
+    const updatedVersion = await app.request(`/api/profile/version?apikey=${issued.token}`)
+    await expect(updatedVersion.json()).resolves.toMatchObject({
+      version: 2,
+      updateTime: expect.any(Number),
+    })
+
     const subscription = await app.request(`${subscriptionUrl.pathname}${subscriptionUrl.search}`)
     expect(subscription.status).toBe(200)
     expect(subscription.headers.get('content-type')).toContain('text/yaml')
@@ -148,6 +167,7 @@ describe('HTTP app', () => {
     expect(subscriptionYaml).toContain('RULE-SET,RenamedRules,REJECT')
     expect(subscriptionYaml).toContain('MATCH,DIRECT')
     expect((await app.request(`/api/profile?apikey=invalid`)).status).toBe(404)
+    expect((await app.request(`/api/profile/version?apikey=invalid`)).status).toBe(404)
 
     const tokens = await app.request('/api/profiles/profile-1/tokens', { headers: adminHeaders })
     expect((await tokens.json() as Array<{ token: string }>)[0]?.token).toBe(issued.token)

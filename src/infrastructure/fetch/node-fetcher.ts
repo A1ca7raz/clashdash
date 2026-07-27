@@ -1,4 +1,7 @@
-import type { RemoteContentFetcher } from '../../application/ports/remote-content-fetcher.ts'
+import type {
+  RemoteContentFetcher,
+  RemoteContentFetchOptions,
+} from '../../application/ports/remote-content-fetcher.ts'
 
 export type NodeFetcherOptions = {
   timeoutMs?: number
@@ -14,16 +17,22 @@ export class NodeFetcher implements RemoteContentFetcher {
   constructor(options: NodeFetcherOptions = {}) {
     this.timeoutMs = options.timeoutMs ?? 30_000
     this.maximumBytes = options.maximumBytes ?? 10 * 1024 * 1024
-    this.userAgent = options.userAgent ?? 'ClashDash/0.1'
+    this.userAgent = options.userAgent ?? 'clash.meta'
   }
 
-  async fetch(url: string): Promise<string> {
+  async fetch(url: string, options: RemoteContentFetchOptions = {}): Promise<string> {
     const target = new URL(url)
     if (target.protocol !== 'http:' && target.protocol !== 'https:') {
       throw new Error(`Unsupported Provider URL protocol: ${target.protocol}`)
     }
+    const headers = new Headers({ accept: 'text/yaml,text/plain,*/*' })
+    for (const [name, values] of Object.entries(options.headers ?? {})) {
+      headers.delete(name)
+      for (const value of values) headers.append(name, value)
+    }
+    headers.set('user-agent', options.userAgent ?? this.userAgent)
     const response = await fetch(target, {
-      headers: { 'user-agent': this.userAgent, accept: 'text/yaml,text/plain,*/*' },
+      headers,
       redirect: 'follow',
       signal: AbortSignal.timeout(this.timeoutMs),
     })

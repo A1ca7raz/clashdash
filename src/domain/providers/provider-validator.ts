@@ -1,6 +1,7 @@
 import type { Diagnostic } from '../diagnostics.ts'
 import type { ProxyProvider } from '../models/provider.ts'
 import { validateOverrideExpression } from './override-expression/evaluator.ts'
+import { parseProviderHeaders } from './provider-headers.ts'
 import { compilePatternList, MihomoPattern } from './mihomo-pattern.ts'
 
 export function validateProvider(provider: ProxyProvider): Diagnostic[] {
@@ -33,6 +34,19 @@ export function validateProvider(provider: ProxyProvider): Diagnostic[] {
     try { validateOverrideExpression(expression) }
     catch (cause) {
       diagnostics.push(error('PROVIDER_OVERRIDE_EXPR_INVALID', `overrideExpr[${index}]: ${errorMessage(cause)}`))
+    }
+  }
+  if (provider.type === 'import') {
+    if (provider.userAgent !== undefined && (
+      typeof provider.userAgent !== 'string' || !provider.userAgent.trim()
+    )) {
+      diagnostics.push(error('PROVIDER_USER_AGENT_INVALID', 'Provider User-Agent must not be empty'))
+    }
+    if (provider.headers !== undefined) {
+      try { parseProviderHeaders(provider.headers) }
+      catch (cause) {
+        diagnostics.push(error('PROVIDER_HEADERS_INVALID', errorMessage(cause)))
+      }
     }
   }
   return diagnostics

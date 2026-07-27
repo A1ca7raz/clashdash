@@ -37,6 +37,15 @@ describe.skipIf(!connectionString)('PostgresStore contract', () => {
       await store.saveRulePack(rulePack)
       await store.saveProfile(profile)
       expect(await store.getProfile(profile.id)).toEqual({ profile, missingReferences: [] })
+      await expect(store.getProfileUpdateInfo(profile.id)).resolves.toMatchObject({
+        version: 1,
+        updateTime: expect.any(Number),
+      })
+      await store.saveProfile(profile)
+      await expect(store.getProfileUpdateInfo(profile.id)).resolves.toMatchObject({
+        version: 2,
+        updateTime: expect.any(Number),
+      })
       await store.saveSubscriptionToken({
         id: `token-${suffix}`, profileId: profile.id, tokenHash: `hash-${suffix}`, encryptedToken: 'encrypted',
       })

@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS providers (
   filter TEXT,
   exclude_filter TEXT,
   exclude_type TEXT,
+  user_agent TEXT,
+  headers_json JSONB,
   override_json JSONB,
   config_json JSONB,
   CHECK (
@@ -26,6 +28,9 @@ CREATE TABLE IF NOT EXISTS providers (
     (type = 'import' AND subscription_format IS NOT NULL AND config_json IS NULL)
   )
 );
+
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS user_agent TEXT;
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS headers_json JSONB;
 
 CREATE TABLE IF NOT EXISTS nodes (
   id TEXT PRIMARY KEY,
@@ -66,10 +71,14 @@ CREATE TABLE IF NOT EXISTS profiles (
   proxy_groups_json JSONB NOT NULL,
   rule_entries_json JSONB NOT NULL,
   rule_provider_ids_json JSONB NOT NULL,
-  passthrough_provider_ids_json JSONB NOT NULL
+  passthrough_provider_ids_json JSONB NOT NULL,
+  version BIGINT NOT NULL DEFAULT 1 CHECK (version > 0),
+  update_time BIGINT NOT NULL DEFAULT (FLOOR(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP))::BIGINT) CHECK (update_time >= 0)
 );
 
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS rule_provider_ids_json JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 1;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS update_time BIGINT NOT NULL DEFAULT (FLOOR(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP))::BIGINT);
 
 CREATE TABLE IF NOT EXISTS subscription_tokens (
   id TEXT PRIMARY KEY,

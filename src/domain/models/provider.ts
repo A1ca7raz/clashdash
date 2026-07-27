@@ -22,6 +22,8 @@ export type ProviderOverride = {
   overrideExpr?: string[]
 }
 
+export type ProviderHeaders = Record<string, string[]>
+
 export type ProviderBase = {
   id: string
   name: string
@@ -41,6 +43,8 @@ export type PassthroughProvider = ProviderBase & {
 export type ImportProvider = ProviderBase & {
   type: 'import'
   subscriptionFormat: 'clash' | 'uri' | 'base64'
+  userAgent?: string
+  headers?: ProviderHeaders
 }
 
 export type ProxyProvider = PassthroughProvider | ImportProvider

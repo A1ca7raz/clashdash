@@ -187,10 +187,55 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .form-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .code-editor { display: block; resize: vertical; color: var(--code-text); background: var(--code-bg); font: 12px/1.65 "SFMono-Regular", Consolas, "Liberation Mono", monospace; tab-size: 2; }
 
-.notice { margin: 14px 0; padding: 12px 14px; border: 1px solid; border-radius: 10px; font-size: 12px; }
-.notice-error { color: var(--danger); background: var(--danger-soft); border-color: var(--danger-border); }
-.notice-success { color: var(--success); background: var(--success-soft); border-color: var(--success-border); }
-.notice-warning { color: var(--warning); background: var(--warning-soft); border-color: var(--warning-border); }
+.toast-viewport {
+  position: fixed;
+  z-index: 100;
+  top: 78px;
+  right: 20px;
+  display: grid;
+  width: min(380px, calc(100vw - 32px));
+  gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  display: grid;
+  grid-template-columns: 4px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 11px;
+  min-height: 52px;
+  padding: 9px 9px 9px 12px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+  animation: toast-enter .18s ease-out;
+}
+.toast-indicator { align-self: stretch; width: 4px; background: var(--text-tertiary); border-radius: 2px; }
+.toast-error .toast-indicator { background: var(--danger); }
+.toast-success .toast-indicator { background: var(--success); }
+.toast-warning .toast-indicator { background: var(--warning); }
+.toast-message { overflow-wrap: anywhere; font-size: 12px; line-height: 1.45; }
+.toast-dismiss {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--text-tertiary);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  font-size: 18px;
+  line-height: 1;
+}
+.toast-dismiss:hover { color: var(--text); background: var(--surface-hover); }
+.toast-closing { opacity: 0; transform: translateX(8px); transition: opacity .18s ease, transform .18s ease; }
+@keyframes toast-enter {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
 /* Login */
 .auth-shell { min-height: 100vh; display: grid; place-items: center; padding: 28px; background: var(--auth-bg); }
@@ -353,7 +398,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .segmented button { min-height: 32px; padding: 0 11px; color: var(--text-secondary); background: transparent; border: 0; border-radius: 8px; font-size: 10px; font-weight: 650; white-space: nowrap; }
 .segmented button:hover { color: var(--text); }
 .segmented button.active { color: var(--text); background: var(--surface); box-shadow: 0 1px 3px rgb(15 23 42 / 10%); }
-.profile-save-notice { margin-inline: 24px; }
 .profile-structured-editor { display: flex; flex-direction: column; gap: 12px; padding: 14px; background: var(--editor-bg); }
 .structured-section { overflow: hidden; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
 .structured-section > header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 11px; min-height: 68px; padding: 13px 15px; background: var(--section-head); border-bottom: 1px solid var(--border); }
@@ -410,14 +454,14 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 .picker-options strong, .picker-options small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .picker-options strong { font-size: 12px; }
 .picker-options small { margin-top: 3px; color: var(--text-tertiary); font-size: 8px; }
-.proxy-group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
-.proxy-group-card { min-width: 0; overflow: hidden; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
-.proxy-group-card > header { padding: 12px; border-bottom: 1px solid var(--border); }
+.proxy-group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+.proxy-group-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 0; padding: 12px 13px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; }
+.proxy-group-identity { min-width: 0; }
 .proxy-group-card strong, .proxy-group-card small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .proxy-group-card strong { font-size: 12px; }
-.proxy-group-card small { margin-top: 3px; color: var(--text-secondary); font-size: 8px; }
-.proxy-group-card pre { min-height: 125px; max-height: 190px; overflow: auto; margin: 0; padding: 13px; color: var(--code-text); background: var(--code-bg); font: 10px/1.55 "SFMono-Regular", Consolas, monospace; }
-.proxy-group-card footer { display: flex; justify-content: flex-end; gap: 7px; padding: 9px; border-top: 1px solid var(--border); }
+.proxy-group-card small { margin-top: 2px; color: var(--text-tertiary); font-size: 8px; }
+.proxy-group-actions { display: flex; flex: 0 0 auto; gap: 7px; }
+.proxy-group-actions .button { min-height: 34px; padding-inline: 11px; }
 .provider-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
 .structured-actions { margin-top: 2px; padding: 18px 2px 3px; border-top: 1px solid var(--border); }
 
@@ -483,6 +527,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
 }
 
 @media (max-width: 760px) {
+  .toast-viewport { top: 68px; right: 16px; }
   .auth-shell { padding: 20px; }
   .auth-card { padding: 24px; }
   .auth-card h2 { margin-top: 24px; }
@@ -532,6 +577,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); box-sha
   .picker-options { grid-template-columns: 1fr; }
   .picker-toolbar { align-items: stretch; flex-direction: column; }
   .proxy-group-grid, .provider-cards { grid-template-columns: 1fr; }
+  .proxy-group-card { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .proxy-group-actions { width: 100%; justify-content: flex-end; }
   .selected-resource-card { grid-template-columns: minmax(0, 1fr); }
   .selected-resource-card > div:last-child { justify-content: flex-end; }
   .structured-actions { align-items: stretch; flex-direction: column-reverse; }

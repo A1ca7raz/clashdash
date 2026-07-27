@@ -18,6 +18,11 @@ export type StoredSubscriptionToken = {
   encryptedToken: string
 }
 
+export type ProfileUpdateInfo = {
+  version: number
+  updateTime: number
+}
+
 export type Awaitable<T> = T | Promise<T>
 
 export interface AppStore {
@@ -49,6 +54,7 @@ export interface AppStore {
 
   listProfiles(): Awaitable<ResolvedProfile[]>
   getProfile(id: string): Awaitable<ResolvedProfile | undefined>
+  getProfileUpdateInfo(id: string): Awaitable<ProfileUpdateInfo | undefined>
   saveProfile(profile: Profile, missingReferences?: readonly MissingProfileReference[]): Awaitable<void>
   deleteProfile(id: string): Awaitable<boolean>
   profileIdsReferencingNode(nodeId: string): Awaitable<string[]>

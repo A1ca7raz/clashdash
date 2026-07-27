@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS providers (
   filter TEXT,
   exclude_filter TEXT,
   exclude_type TEXT,
+  user_agent TEXT,
+  headers_json TEXT,
   override_json TEXT,
   config_json TEXT,
   CHECK (
@@ -65,7 +67,9 @@ CREATE TABLE IF NOT EXISTS profiles (
   proxy_groups_json TEXT NOT NULL,
   rule_entries_json TEXT NOT NULL,
   rule_provider_ids_json TEXT NOT NULL,
-  passthrough_provider_ids_json TEXT NOT NULL
+  passthrough_provider_ids_json TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+  update_time INTEGER NOT NULL DEFAULT (unixepoch()) CHECK (update_time >= 0)
 );
 
 CREATE TABLE IF NOT EXISTS subscription_tokens (

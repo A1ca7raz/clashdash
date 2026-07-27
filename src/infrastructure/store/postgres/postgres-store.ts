@@ -3,6 +3,7 @@ import postgres from 'postgres'
 import { ConflictError, NotFoundError, ValidationError } from '../../../application/errors.ts'
 import type {
   AppStore,
+  ProfileUpdateInfo,
   ProviderNodeState,
   StoredSubscriptionToken,
 } from '../../../application/ports/app-store.ts'
@@ -42,6 +43,7 @@ type TokenRow = {
   encrypted_token: string
 }
 type RuleProviderRow = { id: string; name: string; config_json: RuleProvider['config'] }
+type ProfileUpdateInfoRow = { version: number | string; update_time: number | string }
 type Queryable = postgres.Sql | postgres.TransactionSql
 
 export type PostgresStoreOptions = {
@@ -142,16 +144,18 @@ export class PostgresStore implements AppStore {
       await sql`
         INSERT INTO providers (
           id, type, name, url, interval, subscription_format, filter, exclude_filter,
-          exclude_type, override_json, config_json
+          exclude_type, user_agent, headers_json, override_json, config_json
         ) VALUES (
           ${row.id}, ${row.type}, ${row.name}, ${row.url}, ${row.interval},
           ${row.subscription_format}, ${row.filter}, ${row.exclude_filter}, ${row.exclude_type},
+          ${row.user_agent}, ${jsonOrNull(sql, row.headers_json)},
           ${jsonOrNull(sql, row.override_json)}, ${jsonOrNull(sql, row.config_json)}
         ) ON CONFLICT (id) DO UPDATE SET
           type = EXCLUDED.type, name = EXCLUDED.name, url = EXCLUDED.url,
           interval = EXCLUDED.interval, subscription_format = EXCLUDED.subscription_format,
           filter = EXCLUDED.filter, exclude_filter = EXCLUDED.exclude_filter,
-          exclude_type = EXCLUDED.exclude_type, override_json = EXCLUDED.override_json,
+          exclude_type = EXCLUDED.exclude_type, user_agent = EXCLUDED.user_agent,
+          headers_json = EXCLUDED.headers_json, override_json = EXCLUDED.override_json,
           config_json = EXCLUDED.config_json
       `
       if (provider.type === 'passthrough') await sql`DELETE FROM nodes WHERE provider_id = ${provider.id}`
@@ -268,7 +272,9 @@ export class PostgresStore implements AppStore {
           : entry)
         await sql`
           UPDATE profiles SET rule_entries_json = ${sql.json(rewrittenEntries)},
-            rule_provider_ids_json = ${sql.json(rewrittenSelected)}
+            rule_provider_ids_json = ${sql.json(rewrittenSelected)},
+            version = version + 1,
+            update_time = FLOOR(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP))::BIGINT
           WHERE id = ${row.id}
         `
       }
@@ -331,6 +337,13 @@ export class PostgresStore implements AppStore {
     ))
   }
 
+  async getProfileUpdateInfo(id: string): Promise<ProfileUpdateInfo | undefined> {
+    const [row] = await this.sql<ProfileUpdateInfoRow[]>`
+      SELECT version, update_time FROM profiles WHERE id = ${id}
+    `
+    return row ? { version: Number(row.version), updateTime: Number(row.update_time) } : undefined
+  }
+
   private async removeMissingProfileReferences(value: ResolvedProfile): Promise<ResolvedProfile> {
     if (value.missingReferences.length === 0) return value
     await this.saveProfile(value.profile)
@@ -343,13 +356,14 @@ export class PostgresStore implements AppStore {
       INSERT INTO profiles (
         id, name, tags_json, note, general_config_json, selected_node_ids_json,
         listeners_json, proxy_groups_json, rule_entries_json, passthrough_provider_ids_json
-        , rule_provider_ids_json
+        , rule_provider_ids_json, version, update_time
       ) VALUES (
         ${row.id}, ${row.name}, ${this.sql.json(row.tags_json)}, ${row.note},
         ${this.sql.json(row.general_config_json)}, ${this.sql.json(row.selected_node_ids_json)},
         ${this.sql.json(row.listeners_json)}, ${this.sql.json(row.proxy_groups_json)},
         ${this.sql.json(row.rule_entries_json)}, ${this.sql.json(row.passthrough_provider_ids_json)},
-        ${this.sql.json(row.rule_provider_ids_json)}
+        ${this.sql.json(row.rule_provider_ids_json)}, 1,
+        FLOOR(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP))::BIGINT
       ) ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name, tags_json = EXCLUDED.tags_json, note = EXCLUDED.note,
         general_config_json = EXCLUDED.general_config_json,
@@ -357,7 +371,9 @@ export class PostgresStore implements AppStore {
         listeners_json = EXCLUDED.listeners_json, proxy_groups_json = EXCLUDED.proxy_groups_json,
         rule_entries_json = EXCLUDED.rule_entries_json,
         rule_provider_ids_json = EXCLUDED.rule_provider_ids_json,
-        passthrough_provider_ids_json = EXCLUDED.passthrough_provider_ids_json
+        passthrough_provider_ids_json = EXCLUDED.passthrough_provider_ids_json,
+        version = profiles.version + 1,
+        update_time = FLOOR(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP))::BIGINT
     `
   }
 

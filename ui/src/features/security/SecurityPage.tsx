@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 
 import { api, post } from '../../api/client.ts'
-import { Badge, Button, ErrorNotice, Field } from '../../components/ui.tsx'
+import { Badge, Button, ErrorNotice, Field, ToastMessage } from '../../components/ui.tsx'
 import { PageHeader } from '../../components/Layout.tsx'
 
 type SecurityStatus = {
@@ -43,7 +43,7 @@ function PasswordPanel({ status }: { status: SecurityStatus | undefined }) {
   function submit(event: FormEvent) { event.preventDefault(); setSaved(false); mutation.mutate() }
   return <section className="security-card"><header><div><p>CREDENTIAL</p><h2>修改密码</h2></div><Badge tone="lime">SCRYPT</Badge></header>
     <p className="security-copy">密码以带随机 Salt 的 scrypt 哈希持久化存储。修改环境变量不会覆盖这里保存的新密码。</p>
-    <ErrorNotice error={mutation.error} />{saved && <div className="notice notice-success">密码已更新。</div>}
+    <ErrorNotice error={mutation.error} />{saved && <ToastMessage message="密码已更新。" tone="success" />}
     <form onSubmit={submit}><Field label="当前密码"><input type="password" value={currentPassword} autoComplete="current-password" onChange={(e) => setCurrentPassword(e.target.value)} /></Field>
       <Field label="新密码"><input type="password" value={newPassword} autoComplete="new-password" onChange={(e) => setNewPassword(e.target.value)} /></Field>
       {status?.totpEnabled && <Field label="TOTP 验证码"><input value={totpCode} inputMode="numeric" autoComplete="one-time-code" maxLength={6} onChange={(e) => setTotpCode(digits(e.target.value))} /></Field>}
@@ -83,7 +83,7 @@ function TotpPanel({ status, refresh }: { status: SecurityStatus | undefined; re
         <Button disabled={confirm.isPending || code.length !== 6} onClick={() => confirm.mutate()}>确认并启用</Button>
       </div>
     </div> : <form onSubmit={(e) => { e.preventDefault(); begin.mutate() }}>
-      {status?.totpSetupPending && <div className="notice notice-warning">存在未确认的绑定。重新开始将生成新的 Secret。</div>}
+      {status?.totpSetupPending && <ToastMessage message="存在未确认的绑定。重新开始将生成新的 Secret。" tone="warning" />}
       <Field label="当前密码"><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
       <Button disabled={begin.isPending}>生成绑定二维码</Button>
     </form>}

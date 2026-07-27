@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
 import { NotFoundError, ValidationError } from '../errors.ts'
-import type { AppStore } from '../ports/app-store.ts'
+import type { AppStore, ProfileUpdateInfo, StoredSubscriptionToken } from '../ports/app-store.ts'
 import type { SubscriptionTokenCipher } from '../ports/subscription-token-cipher.ts'
 import type { SubscriptionToken } from '../../domain/models/subscription-token.ts'
 import { compileProfile } from '../../domain/compiler/profile-compiler.ts'
@@ -39,14 +39,20 @@ export class SubscriptionService {
   }
 
   async render(token: string): Promise<{ yaml: string; profileName: string }> {
-    const record = await this.store.getSubscriptionTokenByHash(this.cipher.hash(token))
-    if (!record) throw new NotFoundError('Subscription token not found')
+    const record = await this.findByToken(token)
     const resolved = await this.store.getProfile(record.profileId)
     if (!resolved) throw new NotFoundError(`Profile not found: ${record.profileId}`)
     const result = compileProfile(resolved)
     const errors = result.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')
     if (errors.length > 0) throw new ValidationError(errors.map((item) => item.message).join('; '))
     return { yaml: result.yaml, profileName: resolved.profile.name }
+  }
+
+  async updateInfo(token: string): Promise<ProfileUpdateInfo> {
+    const record = await this.findByToken(token)
+    const info = await this.store.getProfileUpdateInfo(record.profileId)
+    if (!info) throw new NotFoundError(`Profile not found: ${record.profileId}`)
+    return info
   }
 
   private async toDomain(id: string): Promise<SubscriptionToken> {
@@ -60,5 +66,11 @@ export class SubscriptionService {
       profile: resolved.profile,
       token: this.cipher.decrypt(record.encryptedToken),
     }
+  }
+
+  private async findByToken(token: string): Promise<StoredSubscriptionToken> {
+    const record = await this.store.getSubscriptionTokenByHash(this.cipher.hash(token))
+    if (!record) throw new NotFoundError('Subscription token not found')
+    return record
   }
 }

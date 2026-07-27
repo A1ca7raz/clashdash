@@ -2,7 +2,7 @@ import type { JsonObject, JsonValue } from '../../../domain/json.ts'
 import type { Listener, ListenerEntry } from '../../../domain/models/listener.ts'
 import type { Node, ProviderNode, Proxy, UserDefinedNode } from '../../../domain/models/node.ts'
 import type { MissingProfileReference, Profile, ResolvedProfile } from '../../../domain/models/profile.ts'
-import type { ProviderOverride, ProxyProvider } from '../../../domain/models/provider.ts'
+import type { ProviderHeaders, ProviderOverride, ProxyProvider } from '../../../domain/models/provider.ts'
 import type { ProxyGroup } from '../../../domain/models/proxy-group.ts'
 import type { RuleProvider } from '../../../domain/models/rule-provider.ts'
 import type { Rule, RuleEntry, RulePack } from '../../../domain/models/rule.ts'
@@ -17,6 +17,8 @@ export type ProviderRow = {
   filter: string | null
   exclude_filter: string | null
   exclude_type: string | null
+  user_agent: string | null
+  headers_json: string | null
   override_json: string | null
   config_json: string | null
 }
@@ -73,6 +75,10 @@ export function providerToRow(provider: ProxyProvider): ProviderRow {
     filter: provider.filter ?? null,
     exclude_filter: provider.excludeFilter ?? null,
     exclude_type: provider.excludeType ?? null,
+    user_agent: provider.type === 'import' ? provider.userAgent ?? null : null,
+    headers_json: provider.type === 'import' && provider.headers !== undefined
+      ? encodeJson(provider.headers)
+      : null,
     override_json: provider.override === undefined ? null : encodeJson(provider.override as JsonValue),
     config_json: provider.type === 'passthrough' ? encodeJson(provider.config) : null,
   }
@@ -91,7 +97,13 @@ export function rowToProvider(row: ProviderRow): ProxyProvider {
   }
   if (row.type === 'import') {
     if (row.subscription_format === null) throw new Error(`Import provider ${row.id} has no format`)
-    return { type: 'import', ...common, subscriptionFormat: row.subscription_format }
+    return {
+      type: 'import',
+      ...common,
+      subscriptionFormat: row.subscription_format,
+      ...(row.user_agent === null ? {} : { userAgent: row.user_agent }),
+      ...(row.headers_json === null ? {} : { headers: decodeJson<ProviderHeaders>(row.headers_json) }),
+    }
   }
   if (row.config_json === null) throw new Error(`Passthrough provider ${row.id} has no config`)
   return { type: 'passthrough', ...common, config: decodeJson(row.config_json) }
