@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.1.2",
+  "packageManager": "pnpm@10.34.5",
   "scripts": {
     "dev:server": "tsx watch src/server/main.ts",
     "dev:ui": "vite",
@@ -55,7 +55,7 @@
     "tailwindcss": "latest",
     "tsup": "latest",
     "tsx": "latest",
-    "typescript": "latest",
+    "typescript": "5.9.3",
     "vite": "latest",
     "vitest": "latest"
   }
