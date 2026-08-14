@@ -37,19 +37,21 @@ export function RuleProvidersPage() {
     />
     <ErrorNotice error={providers.error} />
     {providers.data?.length
-      ? <div className="management-card-grid">{providers.data.map((provider) => <button
+      ? <div className="rule-provider-list">{providers.data.map((provider) => <button
           key={provider.id}
-          className="management-card rule-provider-management-card"
+          className="rule-provider-list-item"
           onClick={() => setEditing(provider)}
         >
-          <header><Badge tone="cyan">{String(provider.config.type ?? 'unknown').toUpperCase()}</Badge></header>
-          <div><h2>{provider.name}</h2><p>{providerSource(provider)}</p></div>
-          <div className="management-card-stats">
-            <span><b>{String(provider.config.behavior ?? '—').toUpperCase()}</b> BEHAVIOR</span>
-            <span><b>{String(provider.config.format ?? defaultFormat(provider)).toUpperCase()}</b> FORMAT</span>
-            <span><b>{providerAmount(provider)}</b> {provider.config.type === 'inline' ? 'PAYLOAD' : 'INTERVAL'}</span>
-          </div>
-          <footer><span>MIHOMO RULE PROVIDER</span><b>编辑配置 <i>↗</i></b></footer>
+          <span className="rule-provider-list-identity">
+            <Badge tone="cyan">{String(provider.config.type ?? 'unknown').toUpperCase()}</Badge>
+            <span><strong>{provider.name}</strong><small>{providerSource(provider)}</small></span>
+          </span>
+          <span className="rule-provider-list-meta">
+            <span><small>Behavior</small><strong>{String(provider.config.behavior ?? '—').toUpperCase()}</strong></span>
+            <span><small>Format</small><strong>{String(provider.config.format ?? defaultFormat(provider)).toUpperCase()}</strong></span>
+            <span><small>{provider.config.type === 'inline' ? 'Payload' : 'Interval'}</small><strong>{providerAmount(provider)}</strong></span>
+          </span>
+          <span className="rule-provider-list-action">编辑</span>
         </button>)}</div>
       : !providers.isLoading && <Empty
           title="还没有 Rule Provider"
