@@ -19,8 +19,7 @@ export default defineConfig({
     env: {
       ...process.env,
       PORT: '43219',
-      CLASHDASH_DATABASE_DIALECT: 'sqlite',
-      CLASHDASH_DATABASE_PATH: e2eDatabasePath,
+      DATABASE_URL: `sqlite:${e2eDatabasePath}`,
       CLASHDASH_JWT_SECRET: 'e2e-jwt-secret-that-is-at-least-32-bytes',
       CLASHDASH_TOKEN_KEY: 'BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU',
       CLASHDASH_TOTP_KEY: 'BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY',

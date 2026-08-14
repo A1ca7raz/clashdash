@@ -3,6 +3,7 @@ import { serveStatic } from '@hono/node-server/serve-static'
 
 import { createApp } from '../http/app.ts'
 import { createServerContainer } from './container.ts'
+import { databaseType } from './config.ts'
 import { runtimeLogger } from './runtime-logger.ts'
 
 const container = await createServerContainer()
@@ -18,7 +19,7 @@ const server = serve({ fetch: app.fetch, port: container.config.port }, (info) =
   runtimeLogger.info('server.started', {
     port: info.port,
     mode: container.config.mode,
-    database: container.config.dialect,
+    database: databaseType(container.config.databaseUrl),
   })
 })
 

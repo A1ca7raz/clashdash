@@ -6,8 +6,7 @@ import { createServerContainer } from './container.ts'
 
 function environment(databasePath: string, password: string): NodeJS.ProcessEnv {
   return {
-    CLASHDASH_DATABASE_DIALECT: 'sqlite',
-    CLASHDASH_DATABASE_PATH: databasePath,
+    DATABASE_URL: `sqlite:${databasePath}`,
     CLASHDASH_JWT_SECRET: 'container-test-jwt-secret-at-least-32-bytes',
     CLASHDASH_TOKEN_KEY: Buffer.alloc(32, 8).toString('base64url'),
     CLASHDASH_ADMIN_USERNAME: 'admin',

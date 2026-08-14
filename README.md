@@ -51,12 +51,17 @@ npm run seed:demo
 
 演示地址均使用 `example.com`，用于展示模型和 UI，不是真实订阅；点击 ImportProvider 的刷新会失败并保留现有演示节点。不要在生产数据库执行该命令。
 
-## PostgreSQL
+## 数据库
 
-设置：
+SQLite 与 PostgreSQL 统一使用 `DATABASE_URL`，存储实现由 URL 协议决定。本地 SQLite 示例：
 
 ```dotenv
-CLASHDASH_DATABASE_DIALECT=postgres
+DATABASE_URL=sqlite:./data/clashdash.sqlite
+```
+
+PostgreSQL 示例：
+
+```dotenv
 DATABASE_URL=postgres://user:password@host:5432/clashdash
 ```
 

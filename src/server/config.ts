@@ -1,14 +1,12 @@
 import { resolve } from 'node:path'
 
 export type ServerMode = 'local' | 'vercel'
-export type DatabaseDialect = 'sqlite' | 'postgres'
+export type DatabaseType = 'sqlite' | 'postgres'
 
 export type ServerConfig = {
   mode: ServerMode
-  dialect: DatabaseDialect
   port: number
-  databasePath?: string
-  databaseUrl?: string
+  databaseUrl: string
   jwtSecret: string
   tokenKey: string
   totpKey: string
@@ -19,17 +17,16 @@ export type ServerConfig = {
 
 export function loadServerConfig(environment: NodeJS.ProcessEnv = process.env): ServerConfig {
   const mode: ServerMode = environment.VERCEL ? 'vercel' : 'local'
-  const dialect = (environment.CLASHDASH_DATABASE_DIALECT ?? (mode === 'vercel' ? 'postgres' : 'sqlite')) as DatabaseDialect
-  if (dialect !== 'sqlite' && dialect !== 'postgres') {
-    throw new Error('CLASHDASH_DATABASE_DIALECT must be sqlite or postgres')
-  }
-  if (mode === 'vercel' && dialect === 'sqlite') throw new Error('Vercel mode does not support SQLite')
+  const databaseUrl = environment.DATABASE_URL
+    ?? (mode === 'local' ? 'sqlite:./data/clashdash.sqlite' : required(environment, 'DATABASE_URL'))
+  const type = databaseType(databaseUrl)
+  if (mode === 'vercel' && type === 'sqlite') throw new Error('Vercel mode requires a PostgreSQL DATABASE_URL')
   const port = Number(environment.PORT ?? 3000)
   if (!Number.isInteger(port) || port < 1 || port > 65_535) throw new Error('PORT must be a valid TCP port')
   const jwtSecret = required(environment, 'CLASHDASH_JWT_SECRET')
   const tokenKey = required(environment, 'CLASHDASH_TOKEN_KEY')
   const common = {
-    mode, dialect, port,
+    mode, port, databaseUrl,
     jwtSecret,
     tokenKey,
     totpKey: environment.CLASHDASH_TOTP_KEY || tokenKey,
@@ -37,10 +34,34 @@ export function loadServerConfig(environment: NodeJS.ProcessEnv = process.env): 
     adminPassword: required(environment, 'CLASHDASH_ADMIN_PASSWORD'),
     ...(environment.CLASHDASH_CRON_SECRET ? { cronSecret: environment.CLASHDASH_CRON_SECRET } : {}),
   }
-  if (dialect === 'sqlite') {
-    return { ...common, dialect, databasePath: resolve(environment.CLASHDASH_DATABASE_PATH ?? './data/clashdash.sqlite') }
+  return common
+}
+
+export function databaseType(value: string): DatabaseType {
+  const url = parseDatabaseUrl(value)
+  return url.protocol === 'sqlite:' ? 'sqlite' : 'postgres'
+}
+
+export function sqliteDatabasePath(value: string): string {
+  const url = parseDatabaseUrl(value)
+  if (url.protocol !== 'sqlite:') throw new Error('DATABASE_URL is not a SQLite URL')
+  return resolve(decodeURIComponent(url.pathname))
+}
+
+function parseDatabaseUrl(value: string): URL {
+  let url: URL
+  try { url = new URL(value) }
+  catch { throw new Error('DATABASE_URL must be a valid sqlite:, postgres:, or postgresql: URL') }
+  if (url.protocol === 'sqlite:') {
+    if (url.host || !url.pathname) {
+      throw new Error('SQLite DATABASE_URL must use sqlite:./path or sqlite:/absolute/path')
+    }
+    try { decodeURIComponent(url.pathname) }
+    catch { throw new Error('SQLite DATABASE_URL contains an invalid encoded path') }
+    return url
   }
-  return { ...common, dialect, databaseUrl: required(environment, 'DATABASE_URL') }
+  if (url.protocol === 'postgres:' || url.protocol === 'postgresql:') return url
+  throw new Error('DATABASE_URL must use sqlite:, postgres:, or postgresql:')
 }
 
 function required(environment: NodeJS.ProcessEnv, key: string): string {
