@@ -41,8 +41,10 @@ describe('server config', () => {
   })
 
   it('requires PostgreSQL in Vercel mode', () => {
-    expect(loadServerConfig({ ...secrets, VERCEL: '1', DATABASE_URL: 'postgres://example' })).toMatchObject({
-      mode: 'vercel', databaseUrl: 'postgres://example',
+    expect(loadServerConfig({
+      ...secrets, VERCEL: '1', PORT: 'managed-by-vercel', DATABASE_URL: 'postgres://example',
+    })).toMatchObject({
+      mode: 'vercel', databaseUrl: 'postgres://example', port: 3000,
     })
     expect(() => loadServerConfig({ ...secrets, VERCEL: '1', DATABASE_URL: 'sqlite:./vercel.sqlite' }))
       .toThrow('requires a PostgreSQL DATABASE_URL')

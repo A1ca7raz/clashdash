@@ -21,8 +21,7 @@ export function loadServerConfig(environment: NodeJS.ProcessEnv = process.env): 
     ?? (mode === 'local' ? 'sqlite:./data/clashdash.sqlite' : required(environment, 'DATABASE_URL'))
   const type = databaseType(databaseUrl)
   if (mode === 'vercel' && type === 'sqlite') throw new Error('Vercel mode requires a PostgreSQL DATABASE_URL')
-  const port = Number(environment.PORT ?? 3000)
-  if (!Number.isInteger(port) || port < 1 || port > 65_535) throw new Error('PORT must be a valid TCP port')
+  const port = mode === 'local' ? localPort(environment.PORT) : 3000
   const jwtSecret = required(environment, 'CLASHDASH_JWT_SECRET')
   const tokenKey = required(environment, 'CLASHDASH_TOKEN_KEY')
   const common = {
@@ -35,6 +34,12 @@ export function loadServerConfig(environment: NodeJS.ProcessEnv = process.env): 
     ...(environment.CLASHDASH_CRON_SECRET ? { cronSecret: environment.CLASHDASH_CRON_SECRET } : {}),
   }
   return common
+}
+
+function localPort(value: string | undefined): number {
+  const port = Number(value ?? 3000)
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) throw new Error('PORT must be a valid TCP port')
+  return port
 }
 
 export function databaseType(value: string): DatabaseType {
