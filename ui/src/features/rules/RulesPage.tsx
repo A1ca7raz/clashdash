@@ -101,7 +101,7 @@ function RulePackEditor({ value, onDone, onDeleted, onCancel }: {
     <header><div><p>{value ? 'EDIT RULE PACK' : 'NEW RULE PACK'}</p><h2>{name || '未命名规则包'}</h2></div><Badge tone="cyan">{rules.length} RULES</Badge></header>
     <ErrorNotice error={save.error ?? deletion.error} />
     <Field label="规则包名称"><input required placeholder="规则包名称" value={name} onChange={(event) => setName(event.target.value)} /></Field>
-    <div className="rule-pack-rule-editor"><div className="editor-label"><span>完整 Rule 列表</span><small>拖拽调整编译顺序</small></div><RuleListEditor value={rules} onChange={setRules} emptyText="规则包还没有 Rule。" /></div>
+    <RuleListEditor className="rule-pack-rule-editor" title="完整 Rule 列表" detail="拖拽调整编译顺序。" value={rules} onChange={setRules} emptyText="规则包还没有 Rule。" />
     <footer className="editor-actions">{value ? <Button type="button" variant="danger" disabled={deletion.isPending} onClick={() => { if (confirm(`删除 ${value.name}？被 Profile 使用时会拒绝。`)) deletion.mutate() }}>删除规则包</Button> : <Button type="button" variant="quiet" onClick={onCancel}>取消</Button>}<Button disabled={save.isPending}>整体保存</Button></footer>
   </form>
 }

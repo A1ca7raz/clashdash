@@ -79,13 +79,12 @@ export function ProfileEditor({ value, onChanged, onDeleted }: {
   const warnings = preview?.diagnostics.filter((item) => item.severity === 'warning').length ?? 0
 
   return <section className="profile-editor">
-    <header className="profile-editor-head"><div><p>PROFILE AGGREGATE</p><h2>{name || '未命名 Profile'}</h2><div className="tag-row">{splitTags(tags).map((tag) => <Badge key={tag}>#{tag}</Badge>)}</div></div>
+    <header className="profile-editor-head"><div className="profile-editor-identity"><p>PROFILE AGGREGATE</p><input className="profile-name-input" aria-label="Profile 名称" placeholder="未命名 Profile" required value={name} onChange={(event) => setName(event.target.value)} /><input className="profile-tags-input" aria-label="Tags" placeholder="Tags，以逗号分隔" value={tags} onChange={(event) => setTags(event.target.value)} /></div>
       <div className="segmented"><button className={view === 'editor' ? 'active' : ''} onClick={() => setView('editor')}>结构化编辑</button><button className={view === 'preview' ? 'active' : ''} onClick={() => setView('preview')}>YAML 预览</button><button className={view === 'tokens' ? 'active' : ''} onClick={() => setView('tokens')}>订阅 Token</button></div>
     </header>
     <ErrorNotice error={editorError ?? save.error ?? compile.error ?? deletion.error ?? nodes.error ?? providerPool.error ?? rulePacks.error ?? ruleProviderPool.error} />
     {saved && <ToastMessage message="Profile 已保存。" tone="success" />}
     {view === 'editor' && <div className="profile-structured-editor">
-      <BasicSection name={name} tags={tags} onNameChange={setName} onTagsChange={setTags} />
       <GeneralConfigSection value={generalConfigYaml} onChange={setGeneralConfigYaml} />
       <RuleSection value={ruleItems} packs={rulePacks.data ?? []} onChange={setRuleItems} />
       <RuleProviderSelector pool={ruleProviderPool.data ?? []} value={ruleProviders} onChange={setRuleProviders} />
@@ -104,14 +103,6 @@ export function ProfileEditor({ value, onChanged, onDeleted }: {
   </section>
 }
 
-function BasicSection({ name, tags, onNameChange, onTagsChange }: {
-  name: string; tags: string; onNameChange(value: string): void; onTagsChange(value: string): void
-}) {
-  return <EditorSection title="基础信息" detail="名称与 Tag 独立维护。">
-    <div className="form-grid"><Field label="Profile 名称" hideLabel><input placeholder="Profile 名称" required value={name} onChange={(event) => onNameChange(event.target.value)} /></Field><Field label="Tags" hideLabel><input placeholder="Tags，例如：demo, mihomo" value={tags} onChange={(event) => onTagsChange(event.target.value)} /></Field></div>
-  </EditorSection>
-}
-
 function GeneralConfigSection({ value, onChange }: { value: string; onChange(value: string): void }) {
   return <EditorSection title="GeneralConfig" detail="使用 YAML 编辑；保存时编译为对象。">
     <Field label="GeneralConfig YAML" hint="proxies、listeners、proxy-groups、proxy-providers、rule-providers、rules 由下方编辑器生成，不应写在这里。"><textarea className="code-editor yaml-source-editor" rows={13} spellCheck={false} value={value} onChange={(event) => onChange(event.target.value)} /></Field>
@@ -121,9 +112,7 @@ function GeneralConfigSection({ value, onChange }: { value: string; onChange(val
 function RuleSection({ value, packs, onChange }: {
   value: RuleEditorItem[]; packs: RulePack[]; onChange(value: RuleEditorItem[]): void
 }) {
-  return <EditorSection title="规则编辑器" detail="RuleEntry 按列表顺序编译；拖动把手调整优先级。">
-    <RuleListEditor value={value} onChange={onChange} rulePacks={packs} allowRulePacks emptyText="还没有 RuleEntry。至少添加一条 MATCH 或其他规则。" />
-  </EditorSection>
+  return <RuleListEditor title="规则编辑器" detail="RuleEntry 按列表顺序编译；拖动把手调整优先级。" value={value} onChange={onChange} rulePacks={packs} allowRulePacks emptyText="还没有 RuleEntry。至少添加一条 MATCH 或其他规则。" />
 }
 
 function RuleProviderSelector({ pool, value, onChange }: {

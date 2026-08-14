@@ -19,7 +19,6 @@ export function Layout() {
           <NavIcon name={link.icon} /><span>{link.label}</span>
         </NavLink>)}</nav>
         <div className="topbar-tools">
-          <span className="service-status" title="API 服务运行正常"><i className="status-dot" />已连接</span>
           <ThemeToggle />
           <NavLink to="/security" aria-label="账户安全" className={({ isActive }) => `topbar-account ${isActive ? 'active' : ''}`}><NavIcon name="security" /><span>账户</span></NavLink>
           <button className="topbar-logout" aria-label="退出管理登录" title="退出管理登录" onClick={clearAdminToken}><NavIcon name="logout" /></button>

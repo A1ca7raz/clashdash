@@ -33,7 +33,7 @@ export function LoginPage({ onAuthenticated }: { onAuthenticated(): void }) {
     <section className="auth-frame">
       <header className="auth-brand"><div><strong>ClashDash</strong><span>Mihomo 配置管理</span></div></header>
       <form className="auth-card" onSubmit={submit}>
-        <div className="auth-card-head"><span>管理员登录</span><b>安全访问</b></div>
+        <div className="auth-card-head">管理员登录</div>
         <h2>欢迎回来</h2>
         <p>登录后管理节点、规则包与配置文件。</p>
         <ErrorNotice error={error} />
@@ -42,7 +42,6 @@ export function LoginPage({ onAuthenticated }: { onAuthenticated(): void }) {
         {totpRequired && <Field label="双因子验证码" hideLabel><input placeholder="6 位双因子验证码" autoFocus value={totpCode} inputMode="numeric" autoComplete="one-time-code" maxLength={6} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))} /></Field>}
         <Button aria-label={totpRequired ? '验证并登录' : '登录控制台'} disabled={busy}>{busy ? '处理中…' : totpRequired ? '验证并登录' : '登录'}</Button>
       </form>
-      <footer className="auth-meta"><span className="status-dot" />本地优先 · YAML 原生 · Token 安全</footer>
     </section>
   </main>
 }

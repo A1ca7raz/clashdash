@@ -16,11 +16,14 @@ test('login, create a Profile, and use a public subscription token', async ({ pa
   await expect(root).toHaveAttribute('data-theme', toggledTheme)
   await page.reload()
   await expect(root).toHaveAttribute('data-theme', toggledTheme)
+  await expect(page.getByText('安全访问', { exact: true })).toHaveCount(0)
+  await expect(page.getByText(/本地优先/)).toHaveCount(0)
 
   await page.getByLabel('用户名').fill(username)
   await page.getByLabel('密码').fill(password)
   await page.getByRole('button', { name: /登录控制台/ }).click()
   await expect(page.getByRole('heading', { name: '节点与来源' })).toBeVisible()
+  await expect(page.getByText('已连接', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: initialTheme === 'dark' ? '切换到深色模式' : '切换到浅色模式' })).toBeVisible()
 
   await page.getByRole('button', { name: '批量导入' }).click()
@@ -96,9 +99,9 @@ test('login, create a Profile, and use a public subscription token', async ({ pa
   await page.getByRole('button', { name: /新建 Profile/ }).click()
   await expect(page.getByText('PROFILE AGGREGATE')).toBeVisible()
 
-  const basicSection = page.locator('.structured-section').filter({ hasText: '基础信息' })
-  await basicSection.getByLabel('Profile 名称').fill('E2E Structured Profile')
-  await basicSection.getByLabel('Tags').fill('e2e, structured')
+  const profileHeader = page.locator('.profile-editor-head')
+  await profileHeader.getByLabel('Profile 名称').fill('E2E Structured Profile')
+  await profileHeader.getByLabel('Tags').fill('e2e, structured')
   const generalSection = page.locator('.structured-section').filter({ hasText: 'GeneralConfig' })
   await generalSection.getByLabel('GeneralConfig YAML').fill('mode: rule\nmixed-port: 7890\nallow-lan: false\n')
 
@@ -109,10 +112,12 @@ test('login, create a Profile, and use a public subscription token', async ({ pa
   await expect(ruleProviderSection.getByText('E2E Rule Provider')).toBeVisible()
 
   const ruleSection = page.locator('.structured-section').filter({ hasText: '规则编辑器' })
+  const ruleHeader = ruleSection.locator(':scope > header')
   await expect(ruleSection.locator('.rule-row-card')).toHaveCount(1)
-  await ruleSection.getByRole('button', { name: '＋ RulePack' }).click()
+  await ruleHeader.getByRole('button', { name: '＋ RulePack' }).click()
   await page.getByRole('button', { name: /E2E Pack/ }).click()
   await expect(ruleSection.locator('.rule-row-card')).toHaveCount(2)
+  await expect(ruleHeader.getByRole('button', { name: '＋ 内联 Rule' })).toBeVisible()
   await expect(ruleSection.getByRole('button', { name: '＋ Rule Provider' })).toHaveCount(0)
 
   const proxySection = page.locator('.structured-section').filter({ hasText: 'Proxy 选择器' })

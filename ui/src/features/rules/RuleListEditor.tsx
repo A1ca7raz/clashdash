@@ -28,12 +28,16 @@ export function createRuleEditorItem(entry: RuleEntry): RuleEditorItem {
 
 export function RuleListEditor({
   value, onChange, rulePacks = [], allowRulePacks = false, emptyText = '还没有 Rule。',
+  title = '规则编辑器', detail = '拖拽调整编译顺序。', className = '',
 }: {
   value: RuleEditorItem[]
   onChange(value: RuleEditorItem[]): void
   rulePacks?: RulePack[]
   allowRulePacks?: boolean
   emptyText?: string
+  title?: string
+  detail?: string
+  className?: string
 }) {
   const [packPickerOpen, setPackPickerOpen] = useState(false)
   const sensors = useSensors(
@@ -46,17 +50,19 @@ export function RuleListEditor({
     const to = value.findIndex((item) => item.editorId === event.over?.id)
     if (from >= 0 && to >= 0) onChange(arrayMove(value, from, to))
   }
-  return <div className="shared-rule-editor">
-    <div className="rule-editor-toolbar"><div>
+  return <section className={`structured-section shared-rule-editor ${className}`}>
+    <header><div><h3>{title}</h3><p>{detail}</p></div><div className="section-actions rule-editor-actions">
       {allowRulePacks && <Button variant="quiet" type="button" onClick={() => setPackPickerOpen(true)}>＋ RulePack</Button>}
       <Button type="button" onClick={() => onChange([...value, createRuleEditorItem({ type: 'rule', rule: defaultRule() })])}>＋ 内联 Rule</Button>
-    </div></div>
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dragEnd}><SortableContext items={value.map((item) => item.editorId)} strategy={verticalListSortingStrategy}>
-      <div className="rule-card-list">{value.map((item, index) => <SortableRuleCard key={item.editorId} item={item} index={index} onChange={(entry) => onChange(value.map((current) => current.editorId === item.editorId ? { ...current, entry } : current))} onDelete={() => onChange(value.filter((current) => current.editorId !== item.editorId))} />)}</div>
-    </SortableContext></DndContext>
-    {value.length === 0 && <div className="inline-empty">{emptyText}</div>}
+    </div></header>
+    <div className="structured-section-body">
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dragEnd}><SortableContext items={value.map((item) => item.editorId)} strategy={verticalListSortingStrategy}>
+        <div className="rule-card-list">{value.map((item, index) => <SortableRuleCard key={item.editorId} item={item} index={index} onChange={(entry) => onChange(value.map((current) => current.editorId === item.editorId ? { ...current, entry } : current))} onDelete={() => onChange(value.filter((current) => current.editorId !== item.editorId))} />)}</div>
+      </SortableContext></DndContext>
+      {value.length === 0 && <div className="inline-empty">{emptyText}</div>}
+    </div>
     {packPickerOpen && <RulePackChoiceDialog packs={rulePacks} onSelect={(pack) => { onChange([...value, createRuleEditorItem({ type: 'rulePack', rulePack: pack })]); setPackPickerOpen(false) }} onClose={() => setPackPickerOpen(false)} />}
-  </div>
+  </section>
 }
 
 function SortableRuleCard({ item, index, onChange, onDelete }: { item: RuleEditorItem; index: number; onChange(entry: RuleEntry): void; onDelete(): void }) {
