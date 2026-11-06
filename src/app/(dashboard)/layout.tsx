@@ -1,0 +1,27 @@
+import { LogOutIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { logout } from "@/server/actions/auth";
+import { Nav } from "./nav";
+
+export const dynamic = "force-dynamic";
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-svh">
+      <aside className="sticky top-0 flex h-svh w-52 shrink-0 flex-col border-r bg-muted/30 p-3">
+        <div className="px-2 pt-1 pb-4">
+          <div className="font-semibold">ClashDash</div>
+          <div className="text-xs text-muted-foreground">mihomo 配置管理</div>
+        </div>
+        <Nav />
+        <form action={logout} className="mt-auto">
+          <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground" type="submit">
+            <LogOutIcon />
+            退出登录
+          </Button>
+        </form>
+      </aside>
+      <main className="min-w-0 flex-1 p-6">{children}</main>
+    </div>
+  );
+}
