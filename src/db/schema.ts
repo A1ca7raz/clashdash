@@ -93,10 +93,13 @@ export const proxyGroups = pgTable(
 export const ruleProviders = pgTable("rule_providers", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
+  type: text("type").notNull().default("http"),
   behavior: text("behavior").notNull().default("domain"),
   format: text("format").notNull().default("mrs"),
-  url: text("url").notNull(),
+  url: text("url"),
   interval: integer("interval").notNull().default(86400),
+  payload: jsonb("payload").$type<string[]>().notNull().default([]),
+  options: jsonb("options").$type<Record<string, unknown>>().notNull().default({}),
   createdAt: createdAt(),
 });
 

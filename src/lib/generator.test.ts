@@ -182,6 +182,56 @@ describe("generateConfig", () => {
     expect(text).toContain("missing");
   });
 
+  it("emits inline rule providers and preserves HTTP options", () => {
+    const r = generateConfig(
+      input({
+        ruleProviders: [
+          {
+            id: 1,
+            name: "local",
+            type: "inline",
+            behavior: "domain",
+            format: "mrs",
+            url: null,
+            interval: 86400,
+            payload: ["DOMAIN-SUFFIX,example.com"],
+            options: {},
+            createdAt: now,
+          },
+          {
+            id: 2,
+            name: "remote",
+            type: "http",
+            behavior: "domain",
+            format: "yaml",
+            url: "https://example.com/rules.yaml",
+            interval: 600,
+            payload: [],
+            options: { path: "./rules/remote.yaml" },
+            createdAt: now,
+          },
+        ],
+        rules: [
+          rule("RULE-SET", "local", "Proxy"),
+          rule("RULE-SET", "remote", "Proxy"),
+          rule("MATCH", "", "DIRECT"),
+        ],
+      }),
+    );
+    expect(r.errors).toEqual([]);
+    expect(parse(r.yaml)["rule-providers"]).toEqual({
+      local: { type: "inline", behavior: "domain", payload: ["DOMAIN-SUFFIX,example.com"] },
+      remote: {
+        type: "http",
+        behavior: "domain",
+        format: "yaml",
+        url: "https://example.com/rules.yaml",
+        interval: 600,
+        path: "./rules/remote.yaml",
+      },
+    });
+  });
+
   it("warns when a provider's filter matches nothing in the snapshot", () => {
     const r = generateConfig(input({ nodes: [node(1, "HK 1"), node(2, "JP 9")] }));
     expect(r.warnings.join("\n")).toContain("Prov");

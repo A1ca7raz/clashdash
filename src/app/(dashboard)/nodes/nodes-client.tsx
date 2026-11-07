@@ -13,12 +13,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { useRun } from "@/components/use-run";
 import { YamlEditor } from "@/components/yaml-editor";
 import type { Node } from "@/db/schema";
-import { deleteManualNode, importManualNodes, setManualNodeEnabled, updateManualNode } from "@/server/actions/nodes";
+import { createManualNode, deleteManualNode, importManualNodes, setManualNodeEnabled, updateManualNode } from "@/server/actions/nodes";
 
 export function ManualNodesPanel({ nodes, usedBy }: { nodes: Node[]; usedBy: Record<number, string[]> }) {
   const [pending, run] = useRun();
   const [importing, setImporting] = useState(false);
-  const [editing, setEditing] = useState<Node | null>(null);
+  const [editing, setEditing] = useState<Node | "new" | null>(null);
 
   return (
     <div className="grid gap-3">
@@ -26,10 +26,16 @@ export function ManualNodesPanel({ nodes, usedBy }: { nodes: Node[]; usedBy: Rec
         <p className="text-sm text-muted-foreground">
           不属于任何订阅的节点，在配置方案的「订阅与链接」中添加后写入 proxies，代理组可通过来源「手动节点」引用。
         </p>
-        <Button onClick={() => setImporting(true)}>
-          <PlusIcon />
-          导入节点
-        </Button>
+        <div className="flex shrink-0 gap-2">
+          <Button onClick={() => setEditing("new")}>
+            <PlusIcon />
+            添加节点
+          </Button>
+          <Button variant="outline" onClick={() => setImporting(true)}>
+            <PlusIcon />
+            导入节点
+          </Button>
+        </div>
       </div>
       {nodes.length === 0 ? (
         <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">还没有手动节点</div>
@@ -79,7 +85,13 @@ export function ManualNodesPanel({ nodes, usedBy }: { nodes: Node[]; usedBy: Rec
         </div>
       )}
       {importing && <ImportDialog onClose={() => setImporting(false)} />}
-      {editing && <EditDialog node={editing} onClose={() => setEditing(null)} />}
+      {editing && (
+        <NodeDialog
+          key={editing === "new" ? "new" : editing.id}
+          node={editing === "new" ? null : editing}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </div>
   );
 }
@@ -118,14 +130,22 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-function EditDialog({ node, onClose }: { node: Node; onClose: () => void }) {
+const NEW_NODE_TEMPLATE = `name: 我的节点
+type: ss
+server: example.com
+port: 443
+cipher: aes-128-gcm
+password: your-password
+`;
+
+function NodeDialog({ node, onClose }: { node: Node | null; onClose: () => void }) {
   const [pending, run] = useRun();
-  const [text, setText] = useState(() => stringify(node.config));
+  const [text, setText] = useState(() => (node ? stringify(node.config) : NEW_NODE_TEMPLATE));
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>编辑节点</DialogTitle>
+          <DialogTitle>{node ? `编辑节点「${node.name}」` : "添加节点"}</DialogTitle>
           <DialogDescription>mihomo 节点配置（YAML）。</DialogDescription>
         </DialogHeader>
         <YamlEditor value={text} onChange={setText} height="360px" />
@@ -133,7 +153,15 @@ function EditDialog({ node, onClose }: { node: Node; onClose: () => void }) {
           <Button variant="outline" onClick={onClose}>
             取消
           </Button>
-          <Button disabled={pending} onClick={() => run(() => updateManualNode(node.id, text), { success: "已保存", onOk: onClose })}>
+          <Button
+            disabled={pending}
+            onClick={() =>
+              run(() => (node ? updateManualNode(node.id, text) : createManualNode(text)), {
+                success: node ? "已保存" : "已添加",
+                onOk: onClose,
+              })
+            }
+          >
             保存
           </Button>
         </DialogFooter>

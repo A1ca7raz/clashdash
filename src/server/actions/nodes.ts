@@ -10,6 +10,23 @@ import { run } from "./common";
 
 const manual = (id: number) => and(eq(nodes.id, id), isNull(nodes.subscriptionId));
 
+function parseManualNodeConfig(yamlText: string): MihomoProxy {
+  const config = parseYaml(yamlText) as MihomoProxy | null;
+  if (!config || typeof config !== "object" || typeof config.name !== "string" || typeof config.type !== "string") {
+    throw new Error("节点必须是包含 name 和 type 的 YAML 映射");
+  }
+  return config;
+}
+
+export async function createManualNode(yamlText: string) {
+  return run(async (db) => {
+    const config = parseManualNodeConfig(yamlText);
+    const count = await db.$count(nodes, isNull(nodes.subscriptionId));
+    await db.insert(nodes).values({ subscriptionId: null, name: config.name, type: config.type, config, sort: count });
+    revalidatePath("/", "layout");
+  });
+}
+
 export async function importManualNodes(text: string) {
   return run(async (db) => {
     const parsed = parseSubscription(text);
@@ -25,10 +42,7 @@ export async function importManualNodes(text: string) {
 
 export async function updateManualNode(id: number, yamlText: string) {
   return run(async (db) => {
-    const config = parseYaml(yamlText) as MihomoProxy | null;
-    if (!config || typeof config !== "object" || typeof config.name !== "string" || typeof config.type !== "string") {
-      throw new Error("节点必须是包含 name 和 type 的 YAML 映射");
-    }
+    const config = parseManualNodeConfig(yamlText);
     await db.update(nodes).set({ name: config.name, type: config.type, config }).where(manual(id));
     revalidatePath("/", "layout");
   });

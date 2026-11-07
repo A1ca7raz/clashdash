@@ -1,22 +1,20 @@
-import { asc, isNotNull, isNull } from "drizzle-orm";
+import { asc, isNull } from "drizzle-orm";
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getDb } from "@/db";
-import { listeners, nodes, profiles, proxyGroups, rules } from "@/db/schema";
+import { listeners, nodes, profiles } from "@/db/schema";
 import { ListenersPanel } from "./listeners-panel";
 import { ManualNodesPanel } from "./nodes-client";
 
 export default async function NodesPage() {
   const db = await getDb();
-  const [nodeRows, listenerRows, profileRows, groupRows, subRuleRows] = await Promise.all([
+  const [nodeRows, listenerRows, profileRows] = await Promise.all([
     db.select().from(nodes).where(isNull(nodes.subscriptionId)).orderBy(asc(nodes.sort), asc(nodes.id)),
     db.select().from(listeners).orderBy(asc(listeners.sort), asc(listeners.id)),
     db
       .select({ name: profiles.name, manualNodeIds: profiles.manualNodeIds, listenerIds: profiles.listenerIds })
       .from(profiles)
       .orderBy(asc(profiles.sort), asc(profiles.id)),
-    db.selectDistinct({ name: proxyGroups.name }).from(proxyGroups).orderBy(asc(proxyGroups.name)),
-    db.selectDistinct({ name: rules.subRule }).from(rules).where(isNotNull(rules.subRule)).orderBy(asc(rules.subRule)),
   ]);
 
   const nodeUsedBy: Record<number, string[]> = {};
@@ -38,15 +36,7 @@ export default async function NodesPage() {
           <ManualNodesPanel nodes={nodeRows} usedBy={nodeUsedBy} />
         </TabsContent>
         <TabsContent value="listeners" className="mt-4">
-          <ListenersPanel
-            listeners={listenerRows}
-            usedBy={listenerUsedBy}
-            candidates={{
-              groups: groupRows.map((g) => g.name),
-              nodes: nodeRows.map((n) => n.name),
-              subRules: subRuleRows.map((r) => r.name!),
-            }}
-          />
+          <ListenersPanel listeners={listenerRows} usedBy={listenerUsedBy} />
         </TabsContent>
       </Tabs>
     </>

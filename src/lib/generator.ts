@@ -292,7 +292,12 @@ function generate(input: GenerateInput): GenerateResult {
   const ruleProvidersOut: Record<string, unknown> = {};
   for (const p of input.ruleProviders) {
     if (!usedProviders.has(p.name)) continue;
-    ruleProvidersOut[p.name] = { type: "http", behavior: p.behavior, format: p.format, url: p.url, interval: p.interval };
+    ruleProvidersOut[p.name] = {
+      type: p.type,
+      behavior: p.behavior,
+      ...(p.type === "inline" ? { payload: p.payload } : { format: p.format, url: p.url, interval: p.interval }),
+      ...p.options,
+    };
   }
 
   // Listeners
