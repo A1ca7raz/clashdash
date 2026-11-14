@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Listener } from "@/db/schema";
-import { listenerToYaml, parseListenerConfig } from "./listener-config";
+import { listenerToYaml, parseListenerConfig, updateListenerYaml } from "./listener-config";
 
 const listener: Listener = {
   id: 1,
@@ -11,6 +11,7 @@ const listener: Listener = {
   proxy: null,
   subRule: "office",
   options: { udp: true, "size-limit": 1024 },
+  yaml: null,
   enabled: false,
   sort: 0,
 };
@@ -41,6 +42,22 @@ describe("listener YAML config", () => {
       subRule: null,
       options: { stack: "mixed" },
     });
+  });
+
+  it("expands password pointers and updates managed fields without expanding other aliases", () => {
+    const yaml = "name: work\ntype: mixed\nport: 7891\nproxy: Proxy\npassword: *password\n";
+    expect(parseListenerConfig(yaml, [{ name: "password", value: "secret" }])).toMatchObject({
+      proxy: "Proxy",
+      options: { password: "secret" },
+    });
+    expect(() =>
+      parseListenerConfig("name: work\ntype: mixed\nport: 7891\nproxy: *route\n", [{ name: "route", value: "Proxy" }]),
+    ).toThrow("只能作为 password 字段的值");
+
+    const updated = updateListenerYaml(yaml, { name: "copy", proxy: "Other" });
+    expect(updated).toContain("name: copy");
+    expect(updated).toContain("proxy: Other");
+    expect(updated).toContain("password: *password");
   });
 
   it("rejects invalid YAML and non-map roots", () => {

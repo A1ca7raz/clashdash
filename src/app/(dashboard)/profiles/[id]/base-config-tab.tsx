@@ -15,21 +15,24 @@ export function BaseConfigTab() {
   const dirty = text !== profile.baseConfig;
 
   return (
-    <div className="grid gap-3">
-      <p className="text-sm text-muted-foreground">
-        端口、DNS、TUN、sniffer 等顶层配置，原样输出并保留注释。以下字段由平台生成，不能写在这里：
-        <span className="font-mono text-xs">{MANAGED_KEYS.join("、")}</span>。
+    <div className="grid gap-4">
+      <div className="grid gap-1">
+        <h2 className="text-sm font-medium">基础配置</h2>
+        <p className="text-sm text-muted-foreground">端口、DNS、TUN、sniffer 等顶层配置，原样输出并保留注释。</p>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        以下字段由平台生成，不能写在这里：<span className="font-mono">{MANAGED_KEYS.join("、")}</span>。
       </p>
       <YamlEditor value={text} onChange={setText} height="560px" />
-      <div className="flex gap-2">
+      <div className="flex gap-1">
         <Button disabled={pending || !dirty} onClick={() => run(() => saveBaseConfig(profile.id, text), { success: "已保存" })}>
           {pending ? "保存中…" : "保存"}
         </Button>
-        <Button variant="outline" disabled={!dirty} onClick={() => setText(profile.baseConfig)}>
+        <Button variant="ghost" disabled={!dirty} onClick={() => setText(profile.baseConfig)}>
           撤销修改
         </Button>
         <Button variant="ghost" onClick={() => setText(DEFAULT_BASE_CONFIG)}>
-          填入默认模板
+          填入默认基础配置
         </Button>
       </div>
     </div>

@@ -1,21 +1,34 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { listeners, profiles } from "@/db/schema";
+import { z } from "zod";
+import type { Db } from "@/db";
+import { listeners } from "@/db/schema";
 import { parseListenerConfig } from "@/lib/listener-config";
+import { clearPointerReferences, loadYamlPointers, syncPointerReferences } from "@/server/pointer-references";
 import { run } from "./common";
 
 const done = () => revalidatePath("/", "layout");
+const batchIdsSchema = z.array(z.number().int()).min(1).transform((ids) => [...new Set(ids)]);
 
 export async function saveListener(yamlText: string, id?: number) {
   return run(async (db) => {
-    const values = parseListenerConfig(yamlText);
-    if (id) {
-      await db.update(listeners).set(values).where(eq(listeners.id, id));
-    } else {
-      await db.insert(listeners).values({ ...values, sort: await db.$count(listeners) });
-    }
+    const pointers = await loadYamlPointers(db);
+    const values = parseListenerConfig(yamlText, pointers);
+    await db.transaction(async (tx) => {
+      const [saved] = id
+        ? await tx
+            .update(listeners)
+            .set({ ...values, yaml: yamlText })
+            .where(eq(listeners.id, id))
+            .returning({ id: listeners.id })
+        : await tx
+            .insert(listeners)
+            .values({ ...values, yaml: yamlText, sort: await tx.$count(listeners) })
+            .returning({ id: listeners.id });
+      if (saved) await syncPointerReferences(tx, "listener", saved.id, yamlText);
+    });
     done();
   });
 }
@@ -27,16 +40,25 @@ export async function setListenerEnabled(id: number, enabled: boolean) {
   });
 }
 
+async function removeListeners(db: Db, ids: number[]) {
+  return db.transaction(async (tx) => {
+    const deleted = await tx.delete(listeners).where(inArray(listeners.id, ids)).returning({ id: listeners.id });
+    if (deleted.length) await clearPointerReferences(tx, "listener", deleted.map((row) => row.id));
+    return deleted.length;
+  });
+}
+
+export async function deleteListeners(ids: number[]) {
+  return run(async (db) => {
+    const count = await removeListeners(db, batchIdsSchema.parse(ids));
+    done();
+    return count;
+  });
+}
+
 export async function deleteListener(id: number) {
   return run(async (db) => {
-    await db.transaction(async (tx) => {
-      await tx.delete(listeners).where(eq(listeners.id, id));
-      for (const p of await tx.select().from(profiles)) {
-        if (p.listenerIds.includes(id)) {
-          await tx.update(profiles).set({ listenerIds: p.listenerIds.filter((x) => x !== id) }).where(eq(profiles.id, p.id));
-        }
-      }
-    });
+    await removeListeners(db, [id]);
     done();
   });
 }

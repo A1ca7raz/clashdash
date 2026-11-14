@@ -18,7 +18,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
   return (
     <ProfileEditor
       origin={await getOrigin()}
-      profile={profile}
+      profile={{ ...profile, ...input.profile }}
       subscriptions={input.subscriptions.map((s) => ({ id: s.id, name: s.name, mode: s.mode, enabled: s.enabled }))}
       manualNodes={input.nodes
         .filter((n) => n.subscriptionId === null)
@@ -30,6 +30,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
       ruleProviderNames={input.ruleProviders.map((p) => p.name)}
       proxyNames={result.proxyNames}
       sourceNames={result.sourceNames}
+      pointers={input.pointers}
     />
   );
 }

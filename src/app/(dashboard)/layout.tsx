@@ -1,11 +1,18 @@
 import { LogOutIcon } from "lucide-react";
+import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/server/actions/auth";
+import { requireAuth } from "@/server/auth";
 import { Nav } from "./nav";
 
 export const dynamic = "force-dynamic";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  try {
+    await requireAuth();
+  } catch {
+    redirect("/login");
+  }
   return (
     <div className="flex min-h-svh">
       <aside className="sticky top-0 flex h-svh w-52 shrink-0 flex-col border-r bg-muted/30 p-3">

@@ -8,27 +8,6 @@
       "when": 1793783010554,
       "tag": "0000_init",
       "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1793863741275,
-      "tag": "0001_manual_node_ids",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1793865172213,
-      "tag": "0002_reusable_listeners",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1794074886779,
-      "tag": "0003_flippant_chronomancer",
-      "breakpoints": true
     }
   ]
 }

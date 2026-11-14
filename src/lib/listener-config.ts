@@ -2,6 +2,7 @@ import { isMap, parseDocument, stringify } from "yaml";
 import { z, ZodError } from "zod";
 import type { Listener } from "@/db/schema";
 import { LISTENER_TYPES, type ListenerType } from "@/lib/types";
+import { expandYamlPointers, type YamlPointerDefinition } from "@/lib/yaml-pointer";
 
 const MANAGED_FIELDS = new Set(["name", "type", "listen", "port", "proxy", "rule"]);
 
@@ -35,12 +36,24 @@ port: 7891
 udp: true
 `;
 
-export function parseListenerConfig(text: string): ListenerConfigValues {
+export function parseListenerConfig(text: string, pointers: YamlPointerDefinition[] = []): ListenerConfigValues {
   const doc = parseDocument(text);
   if (doc.errors.length) throw new Error(`YAML 语法错误：${doc.errors[0].message}`);
   if (!isMap(doc.contents)) throw new Error("监听器配置必须是 YAML 映射");
+  expandYamlPointers(doc, pointers);
   const { name, type, listen, port, proxy, rule, ...options } = listenerSchema.parse(doc.toJS());
   return { name, type, listen, port: type === "tun" ? null : port, proxy, subRule: rule, options };
+}
+
+export function updateListenerYaml(
+  yaml: string,
+  values: { name?: string; proxy?: string | null; subRule?: string | null },
+): string {
+  const doc = parseDocument(yaml);
+  if (values.name !== undefined) doc.set("name", values.name);
+  if (values.proxy !== undefined) doc.set("proxy", values.proxy);
+  if (values.subRule !== undefined) doc.set("rule", values.subRule);
+  return doc.toString({ verifyAliasOrder: false });
 }
 
 export function listenerToYaml(listener: Listener): string {

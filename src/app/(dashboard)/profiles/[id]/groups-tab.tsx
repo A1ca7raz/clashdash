@@ -33,14 +33,14 @@ export function GroupsTab() {
   return (
     <div className="grid gap-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">拖动调整输出顺序。改名会同步更新引用它的代理组、规则和监听器。</p>
+        <p className="text-sm text-muted-foreground">拖动调整输出顺序。改名会同步更新引用；共享监听器会为当前方案创建副本。</p>
         <Button onClick={() => setEditing("new")}>
           <PlusIcon />
           添加代理组
         </Button>
       </div>
       {groups.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">还没有代理组</div>
+        <div className="py-8 text-sm text-muted-foreground">还没有代理组</div>
       ) : (
         <SortableList
           items={groups}

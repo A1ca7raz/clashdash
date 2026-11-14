@@ -3,12 +3,12 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { NO_RESOLVE_RULE_TYPES, RULE_TYPES, type RuleType } from "@/lib/types";
+import { DIVIDER_RULE_TYPE, EDITOR_RULE_TYPES, NO_RESOLVE_RULE_TYPES, type EditorRuleType, type RuleType } from "@/lib/types";
 import { useEditor } from "./context";
 import { PolicySelect } from "./policy-select";
 
 export interface RuleDraft {
-  type: RuleType;
+  type: EditorRuleType;
   payload: string;
   target: string;
   noResolve: boolean;
@@ -34,20 +34,33 @@ export function RuleForm({ value, onChange, currentSet }: { value: RuleDraft; on
 
   return (
     <div className="grid grid-cols-[11rem_1fr_13rem] gap-2">
-      <Select value={value.type} onValueChange={(t) => set({ type: t as RuleType, noResolve: false })}>
+      <Select
+        value={value.type}
+        onValueChange={(t) => {
+          const type = t as EditorRuleType;
+          set({
+            type,
+            noResolve: false,
+            ...(type === DIVIDER_RULE_TYPE ? { target: "" } : {}),
+            ...(type === "MATCH" ? { payload: "" } : {}),
+          });
+        }}
+      >
         <SelectTrigger className="w-full">
           <SelectValue />
         </SelectTrigger>
         <SelectContent position="popper" className="max-h-80">
-          {RULE_TYPES.map((t) => (
+          {EDITOR_RULE_TYPES.map((t) => (
             <SelectItem key={t} value={t}>
-              {t}
+              {t === DIVIDER_RULE_TYPE ? "分隔线" : t}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
 
-      {value.type === "MATCH" ? (
+      {value.type === DIVIDER_RULE_TYPE ? (
+        <Input value={value.payload} placeholder="分隔线文本（可选）" className="col-span-2" onChange={(e) => set({ payload: e.target.value })} />
+      ) : value.type === "MATCH" ? (
         <div className="flex items-center px-2 text-sm text-muted-foreground">匹配所有剩余流量</div>
       ) : value.type === "RULE-SET" ? (
         <Select value={value.payload || undefined} onValueChange={(payload) => set({ payload })}>
@@ -71,7 +84,7 @@ export function RuleForm({ value, onChange, currentSet }: { value: RuleDraft; on
         />
       )}
 
-      {value.type === "SUB-RULE" ? (
+      {value.type === DIVIDER_RULE_TYPE ? null : value.type === "SUB-RULE" ? (
         <Select value={value.target || undefined} onValueChange={(target) => set({ target })}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="选择子规则" />

@@ -1,4 +1,5 @@
 import { isMap, parseDocument, type Document } from "yaml";
+import { expandYamlPointers, type YamlPointerDefinition } from "@/lib/yaml-pointer";
 
 /** Top-level keys the platform generates; writing them in base_config would define them twice. */
 export const MANAGED_KEYS = [
@@ -30,13 +31,14 @@ function portOf(address: unknown): number | null {
   return m ? Number(m[1]) : null;
 }
 
-export function checkBaseConfig(text: string): BaseConfigCheck {
+export function checkBaseConfig(text: string, pointers: YamlPointerDefinition[] = []): BaseConfigCheck {
   const doc = parseDocument(text || "{}", { keepSourceTokens: false });
   const errors = doc.errors.map((e) => `基础配置 YAML 语法错误：${e.message}`);
   if (errors.length) return { doc: null, errors, ports: [] };
   if (doc.contents !== null && !isMap(doc.contents)) {
     return { doc: null, errors: ["基础配置必须是 YAML 映射（key: value）"], ports: [] };
   }
+  expandYamlPointers(doc, pointers);
 
   for (const key of MANAGED_KEYS) {
     if (doc.has(key)) errors.push(`基础配置中不能包含 \`${key}\`，它由平台生成`);

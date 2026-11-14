@@ -2,7 +2,9 @@
 
 import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { stringify } from "yaml";
+import { BatchManagementControls, BatchSelectionCheckbox, useBatchManagement } from "@/components/batch-management";
 import { ConfirmButton } from "@/components/confirm-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,37 +15,68 @@ import { Textarea } from "@/components/ui/textarea";
 import { useRun } from "@/components/use-run";
 import { YamlEditor } from "@/components/yaml-editor";
 import type { Node } from "@/db/schema";
-import { createManualNode, deleteManualNode, importManualNodes, setManualNodeEnabled, updateManualNode } from "@/server/actions/nodes";
+import { parseManualNodeConfig } from "@/lib/node-config";
+import type { YamlPointerDefinition } from "@/lib/yaml-pointer";
+import {
+  createManualNode,
+  deleteManualNode,
+  deleteManualNodes,
+  importManualNodes,
+  setManualNodeEnabled,
+  updateManualNode,
+} from "@/server/actions/nodes";
 
-export function ManualNodesPanel({ nodes, usedBy }: { nodes: Node[]; usedBy: Record<number, string[]> }) {
+export function ManualNodesPanel({
+  nodes,
+  usedBy,
+  pointers,
+}: {
+  nodes: Node[];
+  usedBy: Record<number, string[]>;
+  pointers: YamlPointerDefinition[];
+}) {
   const [pending, run] = useRun();
   const [importing, setImporting] = useState(false);
   const [editing, setEditing] = useState<Node | "new" | null>(null);
+  const batch = useBatchManagement(nodes.map((node) => node.id));
+  const remove = () =>
+    run(() => deleteManualNodes([...batch.selectedIds]), {
+      success: (count) => `已删除 ${count} 个节点`,
+      onOk: batch.clear,
+    });
 
   return (
     <div className="grid gap-3">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <p className="text-sm text-muted-foreground">
-          不属于任何订阅的节点，在配置方案的「订阅与链接」中添加后写入 proxies，代理组可通过来源「手动节点」引用。
+          不属于任何订阅的节点，在配置方案的「节点与代理组」中添加后写入 proxies，代理组可通过来源「手动节点」引用。
         </p>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Button variant="ghost" onClick={() => setImporting(true)}>
+            <PlusIcon />
+            导入节点
+          </Button>
           <Button onClick={() => setEditing("new")}>
             <PlusIcon />
             添加节点
           </Button>
-          <Button variant="outline" onClick={() => setImporting(true)}>
-            <PlusIcon />
-            导入节点
-          </Button>
         </div>
       </div>
+      <BatchManagementControls
+        batch={batch}
+        totalCount={nodes.length}
+        pending={pending}
+        deleteDescription="将删除所选手动节点及其与配置方案的关联，不会删除订阅节点快照。"
+        onDelete={remove}
+      />
       {nodes.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">还没有手动节点</div>
+        <div className="py-8 text-sm text-muted-foreground">还没有手动节点</div>
       ) : (
-        <div className="rounded-lg border">
+        <div className="border-y">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10"><span className="sr-only">选择</span></TableHead>
                 <TableHead>名称</TableHead>
                 <TableHead className="w-28">类型</TableHead>
                 <TableHead>服务器</TableHead>
@@ -54,7 +87,15 @@ export function ManualNodesPanel({ nodes, usedBy }: { nodes: Node[]; usedBy: Rec
             </TableHeader>
             <TableBody>
               {nodes.map((n) => (
-                <TableRow key={n.id}>
+                <TableRow key={n.id} data-state={batch.selectedIds.has(n.id) ? "selected" : undefined}>
+                  <TableCell>
+                    <BatchSelectionCheckbox
+                      label={`选择节点「${n.name}」`}
+                      checked={batch.selectedIds.has(n.id)}
+                      disabled={pending}
+                      onToggle={() => batch.toggle(n.id)}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{n.name}</TableCell>
                   <TableCell>
                     <Badge variant="secondary">{n.type}</Badge>
@@ -74,7 +115,10 @@ export function ManualNodesPanel({ nodes, usedBy }: { nodes: Node[]; usedBy: Rec
                     <Button variant="ghost" size="icon-sm" onClick={() => setEditing(n)}>
                       <PencilIcon />
                     </Button>
-                    <ConfirmButton title={`删除节点「${n.name}」？`} onConfirm={() => run(() => deleteManualNode(n.id), { success: "已删除" })}>
+                    <ConfirmButton
+                      title={`删除节点「${n.name}」？`}
+                      onConfirm={() => run(() => deleteManualNode(n.id), { success: "已删除" })}
+                    >
                       <Trash2Icon />
                     </ConfirmButton>
                   </TableCell>
@@ -89,6 +133,7 @@ export function ManualNodesPanel({ nodes, usedBy }: { nodes: Node[]; usedBy: Rec
         <NodeDialog
           key={editing === "new" ? "new" : editing.id}
           node={editing === "new" ? null : editing}
+          pointers={pointers}
           onClose={() => setEditing(null)}
         />
       )}
@@ -138,9 +183,31 @@ cipher: aes-128-gcm
 password: your-password
 `;
 
-function NodeDialog({ node, onClose }: { node: Node | null; onClose: () => void }) {
+function NodeDialog({
+  node,
+  pointers,
+  onClose,
+}: {
+  node: Node | null;
+  pointers: YamlPointerDefinition[];
+  onClose: () => void;
+}) {
   const [pending, run] = useRun();
-  const [text, setText] = useState(() => (node ? stringify(node.config) : NEW_NODE_TEMPLATE));
+  const [text, setText] = useState(() => (node ? (node.yaml ?? stringify(node.config)) : NEW_NODE_TEMPLATE));
+
+  const submit = () => {
+    try {
+      parseManualNodeConfig(text, pointers);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err));
+      return;
+    }
+    run(() => (node ? updateManualNode(node.id, text) : createManualNode(text)), {
+      success: node ? "已保存" : "已添加",
+      onOk: onClose,
+    });
+  };
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-2xl">
@@ -153,15 +220,7 @@ function NodeDialog({ node, onClose }: { node: Node | null; onClose: () => void 
           <Button variant="outline" onClick={onClose}>
             取消
           </Button>
-          <Button
-            disabled={pending}
-            onClick={() =>
-              run(() => (node ? updateManualNode(node.id, text) : createManualNode(text)), {
-                success: node ? "已保存" : "已添加",
-                onOk: onClose,
-              })
-            }
-          >
+          <Button disabled={pending} onClick={submit}>
             保存
           </Button>
         </DialogFooter>

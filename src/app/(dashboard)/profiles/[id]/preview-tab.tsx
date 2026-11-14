@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangleIcon, CircleXIcon, DownloadIcon, RefreshCwIcon } from "lucide-react";
+import { AlertTriangleIcon, CircleXIcon, RefreshCwIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -21,14 +21,6 @@ export function PreviewTab() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(load, [profile.id]);
 
-  const download = () => {
-    if (!result) return;
-    const url = URL.createObjectURL(new Blob([result.yaml], { type: "text/yaml" }));
-    const a = Object.assign(document.createElement("a"), { href: url, download: `${profile.name}.yaml` });
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <div className="grid gap-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -39,10 +31,6 @@ export function PreviewTab() {
         {result && (
           <>
             <CopyButton value={result.yaml} label="复制" size="sm" />
-            <Button variant="outline" size="sm" onClick={download}>
-              <DownloadIcon />
-              下载
-            </Button>
             <div className="flex flex-wrap gap-1.5 text-xs">
               <Badge variant="secondary">节点 {result.stats.proxies}</Badge>
               <Badge variant="secondary">provider {result.stats.providers}</Badge>

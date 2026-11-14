@@ -2,6 +2,7 @@
 
 import { EyeIcon, PencilIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
+import { BatchManagementControls, BatchSelectionCheckbox, useBatchManagement } from "@/components/batch-management";
 import { ConfirmButton } from "@/components/confirm-button";
 import { PageHeader } from "@/components/page-header";
 import { SortableList } from "@/components/sortable-list";
@@ -10,14 +11,22 @@ import { Button } from "@/components/ui/button";
 import { useRun } from "@/components/use-run";
 import type { Subscription } from "@/db/schema";
 import { formatBytes, formatDate, formatRelative } from "@/lib/format";
-import { deleteSubscription, refreshSubscriptions, reorderSubscriptions } from "@/server/actions/subscriptions";
+import type { YamlPointerDefinition } from "@/lib/yaml-pointer";
+import { deleteSubscription, deleteSubscriptions, refreshSubscriptions, reorderSubscriptions } from "@/server/actions/subscriptions";
 import { PreviewDialog } from "./preview-dialog";
 import { SubscriptionDialog } from "./subscription-dialog";
 
-export function SubscriptionsClient({ subscriptions }: { subscriptions: Subscription[] }) {
+export function SubscriptionsClient({
+  subscriptions,
+  pointers,
+}: {
+  subscriptions: Subscription[];
+  pointers: YamlPointerDefinition[];
+}) {
   const [pending, run] = useRun();
   const [editing, setEditing] = useState<Subscription | "new" | null>(null);
   const [previewing, setPreviewing] = useState<Subscription | null>(null);
+  const batch = useBatchManagement(subscriptions.map((subscription) => subscription.id));
 
   const refresh = (ids: number[] | "all") =>
     run(() => refreshSubscriptions(ids), {
@@ -25,6 +34,11 @@ export function SubscriptionsClient({ subscriptions }: { subscriptions: Subscrip
         const failed = results.filter((r) => !r.ok);
         return failed.length ? `刷新完成，${failed.length} 个失败` : `已刷新 ${results.length} 个订阅`;
       },
+    });
+  const remove = () =>
+    run(() => deleteSubscriptions([...batch.selectedIds]), {
+      success: (count) => `已删除 ${count} 个订阅`,
+      onOk: batch.clear,
     });
 
   return (
@@ -34,7 +48,7 @@ export function SubscriptionsClient({ subscriptions }: { subscriptions: Subscrip
         description="inline 模式由服务端拉取节点并写入配置；provider 模式以 proxy-provider 输出原始订阅地址，由客户端自行拉取，服务端仅预拉取节点快照用于预览。"
         actions={
           <>
-            <Button variant="outline" disabled={pending || !subscriptions.length} onClick={() => refresh("all")}>
+            <Button variant="ghost" disabled={pending || !subscriptions.length} onClick={() => refresh("all")}>
               <RefreshCwIcon className={pending ? "animate-spin" : undefined} />
               全部刷新
             </Button>
@@ -45,15 +59,33 @@ export function SubscriptionsClient({ subscriptions }: { subscriptions: Subscrip
           </>
         }
       />
+      <div className="mb-4">
+        <BatchManagementControls
+          batch={batch}
+          totalCount={subscriptions.length}
+          pending={pending}
+          deleteDescription="将删除所选订阅及其节点快照，删除配置方案中的订阅关联，并清理代理组中的订阅来源。"
+          onDelete={remove}
+        />
+      </div>
 
       {subscriptions.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">还没有订阅</div>
+        <div className="py-8 text-sm text-muted-foreground">还没有订阅</div>
       ) : (
         <SortableList
           items={subscriptions}
           onReorder={(ids) => run(() => reorderSubscriptions(ids))}
           renderItem={(s) => (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 py-1">
+            <div
+              className="flex flex-wrap items-center gap-x-4 gap-y-1 py-1"
+              data-state={batch.selectedIds.has(s.id) ? "selected" : undefined}
+            >
+              <BatchSelectionCheckbox
+                label={`选择订阅「${s.name}」`}
+                checked={batch.selectedIds.has(s.id)}
+                disabled={pending}
+                onToggle={() => batch.toggle(s.id)}
+              />
               <div className="min-w-48 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{s.name}</span>
@@ -100,6 +132,7 @@ export function SubscriptionsClient({ subscriptions }: { subscriptions: Subscrip
         <SubscriptionDialog
           key={editing === "new" ? "new" : editing.id}
           subscription={editing === "new" ? null : editing}
+          pointers={pointers}
           onClose={() => setEditing(null)}
         />
       )}

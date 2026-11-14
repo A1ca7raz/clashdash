@@ -14,6 +14,7 @@ const httpProvider: RuleProvider = {
   interval: 600,
   payload: [],
   options: { path: "./rules/remote.yaml", header: { "User-Agent": ["mihomo"] } },
+  yaml: null,
   createdAt: now,
 };
 
@@ -57,6 +58,19 @@ describe("rule provider YAML config", () => {
       payload: inlineProvider.payload,
       options: {},
     });
+  });
+
+  it("expands password pointers and rejects them in other fields", () => {
+    const parsed = parseRuleProviderConfig(
+      "name: remote\ntype: http\nbehavior: domain\nurl: https://example.com/rules.yaml\npassword: *password\n",
+      [{ name: "password", value: "secret" }],
+    );
+    expect(parsed.options).toEqual({ password: "secret" });
+    expect(() =>
+      parseRuleProviderConfig("name: remote\ntype: http\nbehavior: domain\nurl: *endpoint\n", [
+        { name: "endpoint", value: "https://example.com/rules.yaml" },
+      ]),
+    ).toThrow("只能作为 password 字段的值");
   });
 
   it("rejects empty inline payload and unsupported provider types", () => {

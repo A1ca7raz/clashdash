@@ -3,7 +3,13 @@ import { jwtVerify } from "jose/jwt/verify";
 
 /** Edge-safe session helpers, shared by middleware and server code. */
 export const SESSION_COOKIE = "clashdash_session";
+export const TOTP_CHALLENGE_COOKIE = "clashdash_totp_challenge";
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
+export const TOTP_CHALLENGE_MAX_AGE = 60 * 5;
+
+export interface SessionPayload {
+  authVersion: number;
+}
 
 function secret(): Uint8Array {
   const value = process.env.JWT_SECRET;
@@ -11,20 +17,41 @@ function secret(): Uint8Array {
   return new TextEncoder().encode(value);
 }
 
-export function createSessionToken(): Promise<string> {
-  return new SignJWT({ sub: "admin" })
+export function createSessionToken(authVersion = 1): Promise<string> {
+  return new SignJWT({ sub: "admin", typ: "session", ver: authVersion })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_MAX_AGE}s`)
     .sign(secret());
 }
 
-export async function verifySessionToken(token: string | undefined): Promise<boolean> {
-  if (!token) return false;
+export async function verifySessionToken(token: string | undefined): Promise<SessionPayload | null> {
+  if (!token) return null;
   try {
-    await jwtVerify(token, secret(), { algorithms: ["HS256"] });
-    return true;
+    const { payload } = await jwtVerify(token, secret(), { algorithms: ["HS256"] });
+    if (payload.sub !== "admin" || payload.typ !== "session" || typeof payload.ver !== "number") return null;
+    return { authVersion: payload.ver };
   } catch {
-    return false;
+    return null;
+  }
+}
+
+export function createTotpChallenge(authVersion: number): Promise<string> {
+  return new SignJWT({ sub: "admin", typ: "totp-challenge", ver: authVersion })
+    .setProtectedHeader({ alg: "HS256" })
+    .setJti(crypto.randomUUID())
+    .setIssuedAt()
+    .setExpirationTime(`${TOTP_CHALLENGE_MAX_AGE}s`)
+    .sign(secret());
+}
+
+export async function verifyTotpChallenge(token: string | undefined): Promise<SessionPayload | null> {
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, secret(), { algorithms: ["HS256"] });
+    if (payload.sub !== "admin" || payload.typ !== "totp-challenge" || typeof payload.ver !== "number") return null;
+    return { authVersion: payload.ver };
+  } catch {
+    return null;
   }
 }

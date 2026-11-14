@@ -2,6 +2,7 @@ import { isMap, parseDocument, stringify } from "yaml";
 import { z, ZodError } from "zod";
 import type { RuleProvider } from "@/db/schema";
 import { RULE_PROVIDER_BEHAVIORS, RULE_PROVIDER_FORMATS } from "@/lib/types";
+import { expandYamlPointers, type YamlPointerDefinition } from "@/lib/yaml-pointer";
 
 const MANAGED_FIELDS = new Set(["name", "type", "behavior", "format", "url", "interval", "payload"]);
 const name = z.string().trim().min(1, "不能为空").regex(/^[^,\s]+$/, "不能包含逗号或空白");
@@ -52,10 +53,11 @@ url: https://example.com/rules.yaml
 interval: 86400
 `;
 
-export function parseRuleProviderConfig(text: string): RuleProviderConfigValues {
+export function parseRuleProviderConfig(text: string, pointers: YamlPointerDefinition[] = []): RuleProviderConfigValues {
   const doc = parseDocument(text);
   if (doc.errors.length) throw new Error(`YAML 语法错误：${doc.errors[0].message}`);
   if (!isMap(doc.contents)) throw new Error("规则集配置必须是 YAML 映射");
+  expandYamlPointers(doc, pointers);
   const parsed = providerSchema.parse(doc.toJS());
   const options = Object.fromEntries(Object.entries(parsed).filter(([key]) => !MANAGED_FIELDS.has(key)));
   if (parsed.type === "inline") {

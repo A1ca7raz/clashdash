@@ -2,32 +2,56 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { checkPassword } from "@/server/auth";
-import { createSessionToken, SESSION_COOKIE, SESSION_MAX_AGE } from "@/lib/session";
+import { getDb } from "@/db";
+import { verifyAdminPassword, verifyTotpLogin } from "@/server/admin-auth";
+import { clearAuthCookies, setSessionCookie, setTotpChallengeCookie } from "@/server/auth";
+import { TOTP_CHALLENGE_COOKIE, verifyTotpChallenge } from "@/lib/session";
 
-export async function login(_prev: { error?: string } | undefined, formData: FormData) {
-  if (!process.env.ADMIN_PASSWORD) return { error: "服务器未设置 ADMIN_PASSWORD" };
-  if (!checkPassword(String(formData.get("password") ?? ""))) return { error: "密码错误" };
+export interface LoginState {
+  error?: string;
+  requiresTotp?: boolean;
+}
 
-  let token: string;
+export async function login(_prev: LoginState | undefined, formData: FormData): Promise<LoginState> {
+  const store = await cookies();
+  const challenge = await verifyTotpChallenge(store.get(TOTP_CHALLENGE_COOKIE)?.value);
+  const token = String(formData.get("token") ?? "");
+  if (challenge) {
+    try {
+      const authVersion = await verifyTotpLogin(await getDb(), token, challenge.authVersion);
+      await setSessionCookie(authVersion);
+    } catch (err) {
+      return { error: (err as Error).message, requiresTotp: true };
+    }
+    redirect("/");
+  }
+  if (token) return { error: "登录验证已过期，请重新输入密码" };
+
+  let auth;
   try {
-    token = await createSessionToken();
+    auth = await verifyAdminPassword(await getDb(), String(formData.get("password") ?? ""));
   } catch (err) {
     return { error: (err as Error).message };
   }
-  const store = await cookies();
-  store.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_MAX_AGE,
-  });
+  if (!auth) return { error: "密码错误" };
+  if (auth.totpSecret) {
+    try {
+      await setTotpChallengeCookie(auth.authVersion);
+    } catch (err) {
+      return { error: (err as Error).message };
+    }
+    return { requiresTotp: true };
+  }
+
+  try {
+    await setSessionCookie(auth.authVersion);
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
   redirect("/");
 }
 
 export async function logout() {
-  const store = await cookies();
-  store.delete(SESSION_COOKIE);
+  await clearAuthCookies();
   redirect("/login");
 }

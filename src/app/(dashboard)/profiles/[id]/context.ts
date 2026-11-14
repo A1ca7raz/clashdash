@@ -2,7 +2,8 @@
 
 import { createContext, useContext } from "react";
 import type { Listener, Profile, ProxyGroup, Rule } from "@/db/schema";
-import type { SubscriptionMode } from "@/lib/types";
+import type { ProfileResourceSelection, SubscriptionMode } from "@/lib/types";
+import type { YamlPointerDefinition } from "@/lib/yaml-pointer";
 
 export interface SubscriptionSummary {
   id: number;
@@ -20,16 +21,17 @@ export interface ManualNodeSummary {
 
 export interface EditorData {
   origin: string;
-  profile: Profile;
+  profile: Profile & ProfileResourceSelection;
   subscriptions: SubscriptionSummary[];
   manualNodes: ManualNodeSummary[];
   groups: ProxyGroup[];
   rules: Rule[];
-  /** All reusable listeners; the profile selects some via `profile.listenerIds`. */
+  /** All reusable listeners; the profile selects some via `profile_listeners`. */
   listeners: Listener[];
   ruleProviderNames: string[];
   proxyNames: string[];
   sourceNames: Record<string, string[]>;
+  pointers: YamlPointerDefinition[];
 }
 
 export const EditorContext = createContext<EditorData | null>(null);

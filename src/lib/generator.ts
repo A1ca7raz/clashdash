@@ -1,12 +1,19 @@
 import { isMap, YAMLMap, type Document, type YAMLSeq } from "yaml";
 import type { Listener, Node, Profile, ProxyGroup, Rule, RuleProvider, Subscription } from "@/db/schema";
 import { checkBaseConfig } from "@/lib/base-config";
+import { parseGroupConfig } from "@/lib/group-config";
+import { parseListenerConfig } from "@/lib/listener-config";
+import { parseManualNodeConfig } from "@/lib/node-config";
 import { applyProcessing, compileProcessing, matchGroupFilter } from "@/lib/processing";
 import { splitFilter, toRegExp } from "@/lib/regex";
-import { BUILTIN_POLICIES, NO_RESOLVE_RULE_TYPES, type MihomoProxy } from "@/lib/types";
+import { parseRuleProviderConfig } from "@/lib/rule-provider-config";
+import { parseProviderSubscription } from "@/lib/subscription-config";
+import { BUILTIN_POLICIES, DIVIDER_RULE_TYPE, NO_RESOLVE_RULE_TYPES, type MihomoProxy, type ProfileResourceSelection } from "@/lib/types";
+import type { YamlPointerDefinition } from "@/lib/yaml-pointer";
 
 export interface GenerateInput {
-  profile: Pick<Profile, "name" | "baseConfig" | "subscriptionIds" | "manualNodeIds" | "listenerIds">;
+  profile: Pick<Profile, "name" | "baseConfig"> & ProfileResourceSelection;
+  pointers: YamlPointerDefinition[];
   /** All subscriptions; the profile's selection and order come from `profile.subscriptionIds`. */
   subscriptions: Subscription[];
   /** Nodes of the selected subscriptions (inline nodes and provider snapshots) plus manual nodes. */
@@ -69,22 +76,57 @@ export function generateConfig(input: GenerateInput): GenerateResult {
 function generate(input: GenerateInput): GenerateResult {
   const errors: string[] = [];
   const warnings: string[] = [];
-  const { profile } = input;
+  const { profile, pointers } = input;
+  const subscriptions = input.subscriptions.map((subscription) =>
+    subscription.yaml ? { ...subscription, ...parseProviderSubscription(subscription.yaml, pointers) } : subscription,
+  );
+  const nodes = input.nodes.map((node) => {
+    if (node.subscriptionId !== null || !node.yaml) return node;
+    const config = parseManualNodeConfig(node.yaml, pointers);
+    return { ...node, name: config.name, type: config.type, config };
+  });
+  const listeners = input.listeners.map((listener) =>
+    listener.yaml ? { ...listener, ...parseListenerConfig(listener.yaml, pointers) } : listener,
+  );
+  const ruleProviders = input.ruleProviders.map((provider) =>
+    provider.yaml ? { ...provider, ...parseRuleProviderConfig(provider.yaml, pointers) } : provider,
+  );
 
   // Base config
-  const base = checkBaseConfig(profile.baseConfig);
+  const base = checkBaseConfig(profile.baseConfig, pointers);
   errors.push(...base.errors);
   const doc = base.doc;
 
   // Selected subscriptions, in profile order
-  const subsById = new Map(input.subscriptions.map((s) => [s.id, s]));
+  const subsById = new Map(subscriptions.map((s) => [s.id, s]));
   const selected: Subscription[] = [];
+  const selectedSubscriptionIds = new Set(profile.subscriptionIds);
+  const selectedSubscriptionsByName = new Map(
+    subscriptions.filter((s) => selectedSubscriptionIds.has(s.id)).map((s) => [s.name, s.id]),
+  );
+  const groups = input.groups.map((group): ProxyGroup => {
+    if (!group.yaml) return group;
+    const parsed = parseGroupConfig(group.yaml, pointers);
+    const subscriptionIds = parsed.members.sources.subscriptions.map((name) => {
+      const id = selectedSubscriptionsByName.get(name);
+      if (id === undefined) throw new Error(`代理组「${parsed.name}」的订阅「${name}」未加入当前配置方案或不存在`);
+      return id;
+    });
+    return {
+      ...group,
+      ...parsed,
+      members: {
+        ...parsed.members,
+        sources: { ...parsed.members.sources, subscriptions: subscriptionIds },
+      },
+    };
+  });
   for (const id of profile.subscriptionIds) {
     const s = subsById.get(id);
     if (s?.enabled) selected.push(s);
   }
   const nodesBySub = new Map<number | null, Node[]>();
-  for (const n of [...input.nodes].sort(bySort)) {
+  for (const n of [...nodes].sort(bySort)) {
     if (!n.enabled) continue;
     const list = nodesBySub.get(n.subscriptionId) ?? [];
     list.push(n);
@@ -156,7 +198,7 @@ function generate(input: GenerateInput): GenerateResult {
   }
 
   // Proxy groups
-  const groups = [...input.groups].sort(bySort);
+  groups.sort(bySort);
   const groupNames = new Set<string>();
   for (const g of groups) {
     if (groupNames.has(g.name)) errors.push(`代理组名称重复：${g.name}`);
@@ -252,9 +294,9 @@ function generate(input: GenerateInput): GenerateResult {
   for (const g of groups) visit(g.name, []);
 
   // Rules and sub-rules
-  const enabledRules = input.rules.filter((r) => r.enabled).sort(bySort);
+  const enabledRules = input.rules.filter((r) => r.enabled && r.type !== DIVIDER_RULE_TYPE).sort(bySort);
   const subRuleNames = new Set(input.rules.map((r) => r.subRule).filter((s): s is string => !!s));
-  const ruleProvidersByName = new Map(input.ruleProviders.map((p) => [p.name, p]));
+  const ruleProvidersByName = new Map(ruleProviders.map((p) => [p.name, p]));
   const usedProviders = new Set<string>();
 
   const checkRule = (r: Rule, where: string) => {
@@ -290,7 +332,7 @@ function generate(input: GenerateInput): GenerateResult {
   }
 
   const ruleProvidersOut: Record<string, unknown> = {};
-  for (const p of input.ruleProviders) {
+  for (const p of ruleProviders) {
     if (!usedProviders.has(p.name)) continue;
     ruleProvidersOut[p.name] = {
       type: p.type,
@@ -304,7 +346,7 @@ function generate(input: GenerateInput): GenerateResult {
   const listenersOut: Record<string, unknown>[] = [];
   const listenerNames = new Set<string>();
   const usedPorts = new Map<number, string>(base.ports.map((p) => [p.port, `基础配置 ${p.source}`]));
-  const listenersById = new Map(input.listeners.map((l) => [l.id, l]));
+  const listenersById = new Map(listeners.map((l) => [l.id, l]));
   const selectedListeners = profile.listenerIds.map((id) => listenersById.get(id)).filter((l): l is Listener => !!l?.enabled);
   for (const l of selectedListeners) {
     const label = `监听器「${l.name}」`;
@@ -346,13 +388,14 @@ function generate(input: GenerateInput): GenerateResult {
   if (doc) {
     if (!isMap(doc.contents)) doc.contents = new YAMLMap();
     setFlowList(doc, "proxies", proxies);
-    if (Object.keys(providers).length) doc.set("proxy-providers", providers);
-    doc.set("proxy-groups", groupOut);
-    if (Object.keys(ruleProvidersOut).length) doc.set("rule-providers", ruleProvidersOut);
-    doc.set("rules", mainRules.map(ruleLine));
-    if (Object.keys(subRulesOut).length) doc.set("sub-rules", subRulesOut);
-    if (listenersOut.length) doc.set("listeners", listenersOut);
-    yaml = doc.toString({ lineWidth: 0 });
+    if (Object.keys(providers).length) setGenerated(doc, "proxy-providers", providers);
+    setGenerated(doc, "proxy-groups", groupOut);
+    if (Object.keys(ruleProvidersOut).length) setGenerated(doc, "rule-providers", ruleProvidersOut);
+    setGenerated(doc, "rules", mainRules.map(ruleLine));
+    if (Object.keys(subRulesOut).length) setGenerated(doc, "sub-rules", subRulesOut);
+    if (listenersOut.length) setGenerated(doc, "listeners", listenersOut);
+    const outputOptions = { lineWidth: 0, aliasDuplicateObjects: false };
+    yaml = doc.toString(outputOptions);
   }
 
   return {
@@ -381,9 +424,13 @@ function orderedProxy(config: MihomoProxy, name: string): MihomoProxy {
   return { name, type, server, port, ...rest };
 }
 
+function setGenerated(doc: Document, key: string, value: unknown): void {
+  doc.set(key, doc.createNode(value, { aliasDuplicateObjects: false }));
+}
+
 /** Proxies render one per line as flow maps, the usual compact Clash style. */
 function setFlowList(doc: Document, key: string, items: object[]) {
-  const node = doc.createNode(items) as YAMLSeq;
+  const node = doc.createNode(items, { aliasDuplicateObjects: false }) as YAMLSeq;
   for (const item of node.items) {
     if (isMap(item)) item.flow = true;
   }

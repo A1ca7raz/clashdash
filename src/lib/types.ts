@@ -1,5 +1,11 @@
 export type SubscriptionMode = "inline" | "provider";
 
+export interface ProfileResourceSelection {
+  subscriptionIds: number[];
+  manualNodeIds: number[];
+  listenerIds: number[];
+}
+
 export interface RenameRule {
   pattern: string;
   target: string;
@@ -109,6 +115,10 @@ export const RULE_TYPES = [
   "MATCH",
 ] as const;
 export type RuleType = (typeof RULE_TYPES)[number];
+
+export const DIVIDER_RULE_TYPE = "DIVIDER" as const;
+export const EDITOR_RULE_TYPES = [...RULE_TYPES, DIVIDER_RULE_TYPE] as const;
+export type EditorRuleType = (typeof EDITOR_RULE_TYPES)[number];
 
 export const NO_RESOLVE_RULE_TYPES: readonly string[] = [
   "IP-CIDR",

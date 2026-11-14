@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useRun } from "@/components/use-run";
 import type { Rule } from "@/db/schema";
 import { ruleLine } from "@/lib/generator";
-import type { RuleType } from "@/lib/types";
+import { DIVIDER_RULE_TYPE, type EditorRuleType } from "@/lib/types";
 import {
   bulkAddRules,
   createSubRule,
@@ -29,6 +29,10 @@ import { EMPTY_RULE, RuleForm, type RuleDraft } from "./rule-form";
 
 const MAIN = "__main__";
 
+const validRule = (draft: RuleDraft) =>
+  draft.type === DIVIDER_RULE_TYPE || (!!draft.target && (draft.type === "MATCH" || !!draft.payload));
+const ruleDescription = (rule: Rule) => (rule.type === DIVIDER_RULE_TYPE ? rule.payload || "分隔线" : ruleLine(rule));
+
 export function RulesTab() {
   const { profile, rules, subRuleNames } = useEditor();
   const [pending, run] = useRun();
@@ -39,6 +43,7 @@ export function RulesTab() {
 
   const activeSet = current && subRuleNames.includes(current) ? current : null;
   const list = rules.filter((r) => (r.subRule ?? null) === activeSet);
+  const ruleNumbers = new Map(list.filter((r) => r.type !== DIVIDER_RULE_TYPE).map((r, index) => [r.id, index + 1]));
 
   const add = () =>
     run(() => saveRule({ profileId: profile.id, subRule: activeSet, ...draft, enabled: true }), {
@@ -46,8 +51,8 @@ export function RulesTab() {
     });
 
   return (
-    <div className="grid gap-3">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="grid gap-5">
+      <div className="flex flex-wrap items-center gap-1">
         <Select value={activeSet ?? MAIN} onValueChange={(v) => setCurrent(v === MAIN ? null : v)}>
           <SelectTrigger className="w-56">
             <SelectValue />
@@ -61,19 +66,19 @@ export function RulesTab() {
             ))}
           </SelectContent>
         </Select>
-        <Button variant="outline" size="sm" onClick={() => setDialog("create")}>
+        <Button variant="ghost" size="sm" onClick={() => setDialog("create")}>
           <PlusIcon />
           新建子规则
         </Button>
         {activeSet && (
           <>
-            <Button variant="outline" size="sm" onClick={() => setDialog("rename")}>
+            <Button variant="ghost" size="sm" onClick={() => setDialog("rename")}>
               重命名
             </Button>
             <ConfirmButton
               title={`删除子规则「${activeSet}」？`}
               description="其中的全部规则会被删除。被规则或监听器引用时无法删除。"
-              variant="outline"
+              variant="ghost"
               size="sm"
               onConfirm={() => run(() => deleteSubRule(profile.id, activeSet), { success: "已删除", onOk: () => setCurrent(null) })}
             >
@@ -82,16 +87,16 @@ export function RulesTab() {
           </>
         )}
         <div className="flex-1" />
-        <Button variant="outline" size="sm" onClick={() => setDialog("bulk")}>
+        <Button variant="ghost" size="sm" onClick={() => setDialog("bulk")}>
           <ClipboardPasteIcon />
           批量导入
         </Button>
       </div>
 
-      <div className="grid gap-2 rounded-lg border p-3">
+      <div className="grid gap-3 border-y py-4">
         <RuleForm value={draft} onChange={setDraft} currentSet={activeSet} />
         <div>
-          <Button size="sm" onClick={add} disabled={pending || !draft.target || (draft.type !== "MATCH" && !draft.payload)}>
+          <Button size="sm" onClick={add} disabled={pending || !validRule(draft)}>
             <PlusIcon />
             添加规则
           </Button>
@@ -100,23 +105,34 @@ export function RulesTab() {
       </div>
 
       {list.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">没有规则</div>
+        <div className="py-8 text-sm text-muted-foreground">没有规则</div>
       ) : (
         <SortableList
           items={list}
           onReorder={(ids) => run(() => reorder("rules", profile.id, ids))}
-          renderItem={(r, i) => (
-            <div className={`flex items-center gap-3 ${r.enabled ? "" : "opacity-50"}`}>
-              <span className="w-8 text-right text-xs text-muted-foreground tabular-nums">{i + 1}</span>
+          renderItem={(r) => (
+            <div className={`flex items-center gap-3 ${r.enabled || r.type === DIVIDER_RULE_TYPE ? "" : "opacity-50"}`}>
+              {r.type !== DIVIDER_RULE_TYPE && (
+                <span className="w-8 text-right text-xs text-muted-foreground tabular-nums">{ruleNumbers.get(r.id)}</span>
+              )}
               <div className="min-w-0 flex-1">
-                <div className="truncate font-mono text-[13px]">{ruleLine(r)}</div>
+                {r.type === DIVIDER_RULE_TYPE ? (
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    {r.payload && <span className="max-w-1/2 truncate">{r.payload}</span>}
+                    <div className="h-px min-w-8 flex-1 bg-border" />
+                  </div>
+                ) : (
+                  <div className="truncate font-mono text-[13px]">{ruleLine(r)}</div>
+                )}
                 {r.remark && <div className="truncate text-xs text-muted-foreground">{r.remark}</div>}
               </div>
-              <Switch checked={r.enabled} onCheckedChange={(v) => run(() => setRuleEnabled(r.id, v))} />
+              {r.type !== DIVIDER_RULE_TYPE && (
+                <Switch checked={r.enabled} onCheckedChange={(v) => run(() => setRuleEnabled(r.id, v))} />
+              )}
               <Button variant="ghost" size="icon-sm" onClick={() => setEditing(r)}>
                 <PencilIcon />
               </Button>
-              <ConfirmButton title="删除这条规则？" description={ruleLine(r)} onConfirm={() => run(() => deleteRule(r.id))}>
+              <ConfirmButton title="删除这条规则？" description={ruleDescription(r)} onConfirm={() => run(() => deleteRule(r.id))}>
                 <Trash2Icon />
               </ConfirmButton>
             </div>
@@ -153,7 +169,7 @@ function EditRuleDialog({ rule, onClose }: { rule: Rule; onClose: () => void }) 
   const { profile } = useEditor();
   const [pending, run] = useRun();
   const [draft, setDraft] = useState<RuleDraft>({
-    type: rule.type as RuleType,
+    type: rule.type as EditorRuleType,
     payload: rule.payload,
     target: rule.target,
     noResolve: rule.noResolve,
@@ -171,7 +187,7 @@ function EditRuleDialog({ rule, onClose }: { rule: Rule; onClose: () => void }) 
             取消
           </Button>
           <Button
-            disabled={pending}
+            disabled={pending || !validRule(draft)}
             onClick={() =>
               run(() => saveRule({ id: rule.id, profileId: profile.id, subRule: rule.subRule, enabled: rule.enabled, ...draft }), {
                 success: "已保存",

@@ -3,6 +3,7 @@
 import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { BatchManagementControls, BatchSelectionCheckbox, useBatchManagement } from "@/components/batch-management";
 import { ConfirmButton } from "@/components/confirm-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,32 +14,57 @@ import { useRun } from "@/components/use-run";
 import { YamlEditor } from "@/components/yaml-editor";
 import type { Listener } from "@/db/schema";
 import { formatListenerConfigError, listenerToYaml, NEW_LISTENER_TEMPLATE, parseListenerConfig } from "@/lib/listener-config";
-import { deleteListener, saveListener, setListenerEnabled } from "@/server/actions/listeners";
+import type { YamlPointerDefinition } from "@/lib/yaml-pointer";
+import { deleteListener, deleteListeners, saveListener, setListenerEnabled } from "@/server/actions/listeners";
 
-export function ListenersPanel({ listeners, usedBy }: { listeners: Listener[]; usedBy: Record<number, string[]> }) {
+export function ListenersPanel({
+  listeners,
+  usedBy,
+  pointers,
+}: {
+  listeners: Listener[];
+  usedBy: Record<number, string[]>;
+  pointers: YamlPointerDefinition[];
+}) {
   const [pending, run] = useRun();
   const [editing, setEditing] = useState<Listener | "new" | null>(null);
+  const batch = useBatchManagement(listeners.map((listener) => listener.id));
+  const remove = () =>
+    run(() => deleteListeners([...batch.selectedIds]), {
+      success: (count) => `已删除 ${count} 个监听器`,
+      onOk: batch.clear,
+    });
 
   const route = (l: Listener) => (l.proxy ? `代理 ${l.proxy}` : l.subRule ? `子规则 ${l.subRule}` : "主规则");
 
   return (
     <div className="grid gap-3">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <p className="text-sm text-muted-foreground">
-          额外的入站端口，在配置方案的「订阅与链接」中添加后生效。指定的代理组或子规则按名称在使用它的方案中查找，方案里必须存在同名项。
+          额外的入站端口，在配置方案的「节点与代理组」中添加后生效。指定的代理组或子规则按名称在使用它的方案中查找，方案里必须存在同名项。
         </p>
-        <Button onClick={() => setEditing("new")}>
-          <PlusIcon />
-          添加监听器
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={() => setEditing("new")}>
+            <PlusIcon />
+            添加监听器
+          </Button>
+        </div>
       </div>
+      <BatchManagementControls
+        batch={batch}
+        totalCount={listeners.length}
+        pending={pending}
+        deleteDescription="将删除所选监听器，并通过外键级联删除配置方案中的监听器关联。"
+        onDelete={remove}
+      />
       {listeners.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">还没有监听器</div>
+        <div className="py-8 text-sm text-muted-foreground">还没有监听器</div>
       ) : (
-        <div className="rounded-lg border">
+        <div className="border-y">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10"><span className="sr-only">选择</span></TableHead>
                 <TableHead>名称</TableHead>
                 <TableHead className="w-28">类型</TableHead>
                 <TableHead>监听</TableHead>
@@ -50,7 +76,15 @@ export function ListenersPanel({ listeners, usedBy }: { listeners: Listener[]; u
             </TableHeader>
             <TableBody>
               {listeners.map((l) => (
-                <TableRow key={l.id}>
+                <TableRow key={l.id} data-state={batch.selectedIds.has(l.id) ? "selected" : undefined}>
+                  <TableCell>
+                    <BatchSelectionCheckbox
+                      label={`选择监听器「${l.name}」`}
+                      checked={batch.selectedIds.has(l.id)}
+                      disabled={pending}
+                      onToggle={() => batch.toggle(l.id)}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{l.name}</TableCell>
                   <TableCell>
                     <Badge variant="secondary">{l.type}</Badge>
@@ -59,7 +93,11 @@ export function ListenersPanel({ listeners, usedBy }: { listeners: Listener[]; u
                   <TableCell className="text-muted-foreground">{route(l)}</TableCell>
                   <TableCell className="text-muted-foreground">{usedBy[l.id]?.join("、") || "—"}</TableCell>
                   <TableCell>
-                    <Switch checked={l.enabled} disabled={pending} onCheckedChange={(v) => run(() => setListenerEnabled(l.id, v))} />
+                    <Switch
+                      checked={l.enabled}
+                      disabled={pending}
+                      onCheckedChange={(v) => run(() => setListenerEnabled(l.id, v))}
+                    />
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon-sm" onClick={() => setEditing(l)}>
@@ -83,6 +121,7 @@ export function ListenersPanel({ listeners, usedBy }: { listeners: Listener[]; u
         <ListenerDialog
           key={editing === "new" ? "new" : editing.id}
           listener={editing === "new" ? null : editing}
+          pointers={pointers}
           onClose={() => setEditing(null)}
         />
       )}
@@ -90,13 +129,21 @@ export function ListenersPanel({ listeners, usedBy }: { listeners: Listener[]; u
   );
 }
 
-function ListenerDialog({ listener, onClose }: { listener: Listener | null; onClose: () => void }) {
+function ListenerDialog({
+  listener,
+  pointers,
+  onClose,
+}: {
+  listener: Listener | null;
+  pointers: YamlPointerDefinition[];
+  onClose: () => void;
+}) {
   const [pending, run] = useRun();
-  const [text, setText] = useState(() => (listener ? listenerToYaml(listener) : NEW_LISTENER_TEMPLATE));
+  const [text, setText] = useState(() => (listener ? (listener.yaml ?? listenerToYaml(listener)) : NEW_LISTENER_TEMPLATE));
 
   const submit = () => {
     try {
-      parseListenerConfig(text);
+      parseListenerConfig(text, pointers);
     } catch (err) {
       toast.error(formatListenerConfigError(err));
       return;
