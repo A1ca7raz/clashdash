@@ -10,5 +10,5 @@ export default async function SubscriptionsPage() {
     db.select().from(subscriptions).orderBy(asc(subscriptions.sort), asc(subscriptions.id)),
     loadYamlPointers(db),
   ]);
-  return <SubscriptionsClient subscriptions={rows} pointers={pointers} />;
+  return <SubscriptionsClient subscriptions={rows} pointers={pointers} builtInCronEnabled={!process.env.VERCEL} />;
 }

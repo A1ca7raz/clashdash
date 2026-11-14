@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRun } from "@/components/use-run";
 import { YamlEditor } from "@/components/yaml-editor";
 import type { Subscription } from "@/db/schema";
@@ -30,7 +31,7 @@ interface SubscriptionForm {
   userAgent: string;
   enabled: boolean;
   mode: SubscriptionMode;
-  cacheTtl: number;
+  refreshInterval: number;
   processing: Processing;
   providerOptions: ProviderOptions;
 }
@@ -38,10 +39,12 @@ interface SubscriptionForm {
 export function SubscriptionDialog({
   subscription,
   pointers,
+  builtInCronEnabled,
   onClose,
 }: {
   subscription: Subscription | null;
   pointers: YamlPointerDefinition[];
+  builtInCronEnabled: boolean;
   onClose: () => void;
 }) {
   const [pending, run] = useRun();
@@ -52,7 +55,7 @@ export function SubscriptionDialog({
     userAgent: subscription?.userAgent ?? "clash.meta",
     enabled: subscription?.enabled ?? true,
     mode: subscription?.mode ?? "inline",
-    cacheTtl: subscription?.cacheTtl ?? 3600,
+    refreshInterval: subscription?.refreshInterval ?? 3600,
     processing: subscription?.processing ?? {},
     providerOptions: subscription?.providerOptions ?? {},
   }));
@@ -136,15 +139,25 @@ export function SubscriptionDialog({
                   <Label>User-Agent</Label>
                   <Input value={form.userAgent} onChange={(e) => set({ userAgent: e.target.value })} />
                 </div>
-                <div className="grid gap-1.5">
-                  <Label>服务端缓存（秒）</Label>
-                  <Input
-                    type="number"
-                    min={60}
-                    value={form.cacheTtl}
-                    onChange={(e) => set({ cacheTtl: Number(e.target.value) })}
-                  />
-                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="grid gap-1.5">
+                      <Label>缓存刷新间隔（秒）</Label>
+                      <Input
+                        type="number"
+                        min={60}
+                        value={form.refreshInterval}
+                        disabled={!builtInCronEnabled || !form.enabled}
+                        onChange={(e) => set({ refreshInterval: Number(e.target.value) })}
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  {(!builtInCronEnabled || !form.enabled) && (
+                    <TooltipContent>
+                      {!builtInCronEnabled ? "Vercel 部署不使用内建 Cron，请使用外部 Cron 刷新。" : "启用订阅后才能设置自动刷新间隔。"}
+                    </TooltipContent>
+                  )}
+                </Tooltip>
               </div>
 
               <Separator />

@@ -33,7 +33,7 @@ export const subscriptions = pgTable("subscriptions", {
   mode: text("mode").$type<SubscriptionMode>().notNull().default("inline"),
   processing: jsonb("processing").$type<Processing>().notNull().default({}),
   providerOptions: jsonb("provider_options").$type<ProviderOptions>().notNull().default({}),
-  cacheTtl: integer("cache_ttl").notNull().default(3600),
+  refreshInterval: integer("refresh_interval").notNull().default(3600),
   lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
   lastFetchedAt: timestamp("last_fetched_at", { withTimezone: true }),
   refreshingAt: timestamp("refreshing_at", { withTimezone: true }),

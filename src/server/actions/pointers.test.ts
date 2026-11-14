@@ -103,7 +103,7 @@ dns:
 url: https://example.com/shared
 userAgent: clash.meta
 enabled: true
-cacheTtl: 3600
+refreshInterval: 3600
 providerOptions:
   interval: 1200
 processing:

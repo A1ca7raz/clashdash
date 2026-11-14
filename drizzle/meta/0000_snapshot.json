@@ -1060,8 +1060,8 @@
           "notNull": true,
           "default": "'{}'::jsonb"
         },
-        "cache_ttl": {
-          "name": "cache_ttl",
+        "refresh_interval": {
+          "name": "refresh_interval",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

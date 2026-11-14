@@ -134,7 +134,7 @@ CREATE TABLE "subscriptions" (
 	"mode" text DEFAULT 'inline' NOT NULL,
 	"processing" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"provider_options" jsonb DEFAULT '{}'::jsonb NOT NULL,
-	"cache_ttl" integer DEFAULT 3600 NOT NULL,
+	"refresh_interval" integer DEFAULT 3600 NOT NULL,
 	"last_attempt_at" timestamp with time zone,
 	"last_fetched_at" timestamp with time zone,
 	"refreshing_at" timestamp with time zone,

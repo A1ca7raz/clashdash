@@ -19,9 +19,11 @@ import { SubscriptionDialog } from "./subscription-dialog";
 export function SubscriptionsClient({
   subscriptions,
   pointers,
+  builtInCronEnabled,
 }: {
   subscriptions: Subscription[];
   pointers: YamlPointerDefinition[];
+  builtInCronEnabled: boolean;
 }) {
   const [pending, run] = useRun();
   const [editing, setEditing] = useState<Subscription | "new" | null>(null);
@@ -133,6 +135,7 @@ export function SubscriptionsClient({
           key={editing === "new" ? "new" : editing.id}
           subscription={editing === "new" ? null : editing}
           pointers={pointers}
+          builtInCronEnabled={builtInCronEnabled}
           onClose={() => setEditing(null)}
         />
       )}

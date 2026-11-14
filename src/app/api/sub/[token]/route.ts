@@ -1,8 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { profiles } from "@/db/schema";
-import { refreshMany } from "@/server/fetcher";
-import { aggregateUserInfo, generateForProfile, loadProfileResources } from "@/server/profile-data";
+import { aggregateUserInfo, generateForProfile } from "@/server/profile-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,9 +12,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   const [profile] = await db.select().from(profiles).where(eq(profiles.token, token)).limit(1);
   if (!profile) return new Response("Not Found", { status: 404 });
 
-  // Only subscriptions whose cache TTL expired are fetched; failures fall back to the cached nodes.
-  const { subscriptionIds } = await loadProfileResources(db, profile.id);
-  await refreshMany(db, subscriptionIds);
   const { input, result } = await generateForProfile(db, profile);
 
   if (result.errors.length) {

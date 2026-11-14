@@ -23,7 +23,7 @@ beforeEach(async () => {
 }, 60_000);
 
 function providerYaml(url = "https://example.com/sub", userAgent = "clash.meta") {
-  return `name: Air\nurl: ${url}\nuserAgent: ${userAgent}\nenabled: true\ncacheTtl: 3600\nproviderOptions:\n  interval: 1800\n  healthCheck:\n    enable: true\n    lazy: true\nprocessing:\n  include: " 香港 "\n  rename:\n    - pattern: HK\n      target: 香港\n`;
+  return `name: Air\nurl: ${url}\nuserAgent: ${userAgent}\nenabled: true\nrefreshInterval: 3600\nproviderOptions:\n  interval: 1800\n  healthCheck:\n    enable: true\n    lazy: true\nprocessing:\n  include: " 香港 "\n  rename:\n    - pattern: HK\n      target: 香港\n`;
 }
 
 describe("subscription YAML action", () => {
@@ -55,7 +55,7 @@ describe("subscription YAML action", () => {
     if (!created.ok) throw new Error(created.error);
     fetcher.refreshSubscription.mockClear();
 
-    expect(await saveProviderSubscription(providerYaml().replace("cacheTtl: 3600", "cacheTtl: 7200"), created.data)).toMatchObject({
+    expect(await saveProviderSubscription(providerYaml().replace("refreshInterval: 3600", "refreshInterval: 7200"), created.data)).toMatchObject({
       ok: true,
     });
     expect(fetcher.refreshSubscription).not.toHaveBeenCalled();
@@ -87,7 +87,7 @@ describe("subscription YAML action", () => {
       userAgent: "clash.meta",
       enabled: true,
       mode: "inline",
-      cacheTtl: 3600,
+      refreshInterval: 3600,
       processing: {},
       providerOptions: {},
     });
@@ -104,7 +104,7 @@ describe("subscription YAML action", () => {
       userAgent: "clash.meta",
       enabled: true,
       mode: "inline",
-      cacheTtl: 3600,
+      refreshInterval: 3600,
       processing: {},
       providerOptions: {},
     });

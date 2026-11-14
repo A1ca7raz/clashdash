@@ -34,7 +34,7 @@ const subscriptionFields = {
   url: z.string().trim().url("不是有效的地址"),
   userAgent: z.string().trim().default("clash.meta"),
   enabled: z.boolean().default(true),
-  cacheTtl: z.number().int().min(60, "至少 60 秒").default(3600),
+  refreshInterval: z.number().int().min(60, "至少 60 秒").default(3600),
   processing: processingSchema.default({}),
   providerOptions: providerOptionsSchema.default({}),
 };
@@ -56,7 +56,8 @@ export const NEW_PROVIDER_TEMPLATE = `name: 我的订阅
 url: https://example.com/sub
 userAgent: clash.meta
 enabled: true
-cacheTtl: 3600
+# 仅 Node.js 部署使用内建 Cron 主动刷新
+refreshInterval: 3600
 providerOptions:
   interval: 3600
   healthCheck:
@@ -81,7 +82,7 @@ export function providerSubscriptionToYaml(subscription: Subscription | Subscrip
     url: subscription.url,
     userAgent: subscription.userAgent ?? "clash.meta",
     enabled: subscription.enabled ?? true,
-    cacheTtl: subscription.cacheTtl ?? 3600,
+    refreshInterval: subscription.refreshInterval ?? 3600,
     providerOptions: subscription.providerOptions ?? {},
     processing: subscription.processing ?? {},
   });

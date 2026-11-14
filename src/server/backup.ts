@@ -122,6 +122,10 @@ export async function importAll(db: Db, raw: unknown) {
     for (const [key, table] of TABLES) {
       const rows = backup.data[key].map((row) => {
         const out: Record<string, unknown> = { ...row };
+        if (key === "subscriptions" && "cacheTtl" in out) {
+          if (!("refreshInterval" in out)) out.refreshInterval = out.cacheTtl;
+          delete out.cacheTtl;
+        }
         for (const f of DATE_FIELDS) if (typeof out[f] === "string") out[f] = new Date(out[f] as string);
         return out;
       });

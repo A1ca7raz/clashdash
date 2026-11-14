@@ -14,7 +14,7 @@ const subscription: SubscriptionInput = {
   url: "https://example.com/sub",
   userAgent: "mihomo",
   enabled: false,
-  cacheTtl: 7200,
+  refreshInterval: 7200,
   providerOptions: {
     interval: 1800,
     healthCheck: { enable: true, url: "https://www.gstatic.com/generate_204", interval: 100, lazy: false },
@@ -35,7 +35,7 @@ describe("provider subscription YAML", () => {
       name: "我的订阅",
       url: "https://example.com/sub",
       enabled: true,
-      cacheTtl: 3600,
+      refreshInterval: 3600,
       providerOptions: { interval: 3600, healthCheck: { enable: false } },
       processing: {},
     });
@@ -50,7 +50,7 @@ describe("provider subscription YAML", () => {
       url: subscription.url,
       userAgent: subscription.userAgent,
       enabled: subscription.enabled,
-      cacheTtl: subscription.cacheTtl,
+      refreshInterval: subscription.refreshInterval,
       providerOptions: subscription.providerOptions,
       processing: subscription.processing,
     });
@@ -62,7 +62,7 @@ describe("provider subscription YAML", () => {
       url: "https://example.com/sub",
       userAgent: "clash.meta",
       enabled: true,
-      cacheTtl: 3600,
+      refreshInterval: 3600,
       providerOptions: {},
       processing: {},
     });
@@ -81,7 +81,7 @@ describe("provider subscription YAML", () => {
     expect(() =>
       parseProviderSubscription("name: Air\nurl: https://example.com\nproviderOptions:\n  healthCheck:\n    enable: true\n    interval: -1"),
     ).toThrow();
-    expect(() => parseProviderSubscription("name: Air\nurl: https://example.com\ncacheTtl: 30")).toThrow("至少 60 秒");
+    expect(() => parseProviderSubscription("name: Air\nurl: https://example.com\nrefreshInterval: 30")).toThrow("至少 60 秒");
   });
 
   it("formats nested validation paths", () => {

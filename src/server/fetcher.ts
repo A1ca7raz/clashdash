@@ -180,12 +180,12 @@ async function refreshSubscriptionInternal(
   }
 }
 
-export function isStale(sub: Subscription, now = Date.now()): boolean {
+export function shouldRefresh(sub: Subscription, now = Date.now()): boolean {
   if (!sub.lastAttemptAt) return true;
-  return now - sub.lastAttemptAt.getTime() > sub.cacheTtl * 1000;
+  return now - sub.lastAttemptAt.getTime() >= sub.refreshInterval * 1000;
 }
 
-/** Refreshes enabled subscriptions concurrently; only stale ones unless `force`. */
+/** Refreshes enabled subscriptions concurrently; only due ones unless `force`. */
 export async function refreshMany(
   db: Db,
   ids: number[] | "all",
@@ -197,7 +197,7 @@ export async function refreshMany(
       : ids.length
         ? await db.select().from(subscriptions).where(inArray(subscriptions.id, ids))
         : [];
-  const targets = rows.filter((s) => s.enabled && (force || isStale(s)));
+  const targets = rows.filter((s) => s.enabled && (force || shouldRefresh(s)));
   const settled = await Promise.allSettled(targets.map((s) => refreshSubscription(db, s, timeoutMs)));
   return settled.map((r, i) =>
     r.status === "fulfilled" ? r.value : { id: targets[i].id, ok: false, count: 0, error: String(r.reason) },

@@ -63,7 +63,7 @@ npm run dev
    curl -H "Authorization: Bearer $CRON_SECRET" https://your-domain.example/api/cron/refresh
    ```
 
-   此外客户端拉取订阅链接时，超过缓存时长的订阅会按需刷新（单次最多等待 8 秒，失败则沿用上次的节点）。
+Node.js 自托管部署会在启动时运行内建调度器，每 30 秒检查一次，并按每个订阅的 `refreshInterval`（刷新间隔，秒）主动刷新，无需设置 `CRON_SECRET`。Vercel 不运行内建调度器；客户端拉取配置只使用已保存的节点快照，不会因刷新间隔到期而触发服务端拉取。所有部署仍可在订阅页面手动刷新，或通过上述外部 Cron 接口强制刷新全部启用的订阅。
 
 ### 注意
 

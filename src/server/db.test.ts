@@ -240,6 +240,11 @@ describe("database flow (PGlite)", () => {
     delete legacy.data.profileManualNodes;
     delete legacy.data.profileListeners;
     delete legacy.data.pointers;
+    const expectedRefreshInterval = legacy.data.subscriptions[0].refreshInterval;
+    for (const subscription of legacy.data.subscriptions) {
+      subscription.cacheTtl = subscription.refreshInterval;
+      delete subscription.refreshInterval;
+    }
 
     await importAll(db, legacy);
     const [restored] = await db.select().from(profiles).orderBy(asc(profiles.sort), asc(profiles.id));
@@ -247,6 +252,7 @@ describe("database flow (PGlite)", () => {
     expect(resources.subscriptionIds).toEqual([1]);
     expect(resources.manualNodeIds).toHaveLength(1);
     expect(resources.listenerIds).toHaveLength(3);
+    expect((await db.select().from(subscriptions))[0].refreshInterval).toBe(expectedRefreshInterval);
   });
 
   it("imports v2 backups without pointers", async () => {

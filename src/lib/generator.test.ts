@@ -14,7 +14,7 @@ function sub(p: Partial<Subscription> & Pick<Subscription, "id" | "name">): Subs
     mode: "inline",
     processing: {},
     providerOptions: {},
-    cacheTtl: 3600,
+    refreshInterval: 3600,
     lastAttemptAt: null,
     lastFetchedAt: null,
     refreshingAt: null,
@@ -323,7 +323,7 @@ cipher: aes-128-gcm
 url: https://example.com/latest-sub
 userAgent: clash.meta
 enabled: true
-cacheTtl: 3600
+refreshInterval: 3600
 providerOptions:
   interval: 1200
 processing: {}
