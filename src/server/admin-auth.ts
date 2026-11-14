@@ -33,13 +33,32 @@ export async function verifyPasswordHash(password: string, encoded: string): Pro
 export async function ensureAdminAuth(db: Db): Promise<AdminAuth> {
   const [existing] = await db.select().from(adminAuth).where(eq(adminAuth.id, ADMIN_ID));
   if (existing) return existing;
-  const initialPassword = process.env.ADMIN_PASSWORD;
-  if (!initialPassword) throw new Error("管理员尚未初始化，请设置 ADMIN_PASSWORD");
+  const initialPassword = process.env.ADMIN_INITIAL_PASSWORD;
+  if (!initialPassword) throw new Error("管理员尚未初始化，请设置 ADMIN_INITIAL_PASSWORD");
   const passwordHash = await hashPassword(initialPassword);
   await db.insert(adminAuth).values({ id: ADMIN_ID, passwordHash }).onConflictDoNothing();
   const [row] = await db.select().from(adminAuth).where(eq(adminAuth.id, ADMIN_ID));
   if (!row) throw new Error("管理员初始化失败");
   return row;
+}
+
+export async function applyAdminPasswordOverride(db: Db): Promise<boolean> {
+  const password = process.env.ADMIN_OVERRIDE_PASSWORD;
+  if (!password) return false;
+  const row = await ensureAdminAuth(db);
+  const passwordHash = await hashPassword(password);
+  await db
+    .update(adminAuth)
+    .set({
+      passwordHash,
+      authVersion: row.authVersion + 1,
+      totpSecret: null,
+      totpPendingSecret: null,
+      totpLastCounter: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(adminAuth.id, ADMIN_ID));
+  return true;
 }
 
 export async function verifyAdminPassword(db: Db, password: string): Promise<AdminAuth | null> {

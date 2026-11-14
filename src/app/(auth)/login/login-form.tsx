@@ -1,13 +1,14 @@
 "use client";
 
 import { useActionState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { login } from "@/server/actions/auth";
 
-export function LoginForm() {
+export function LoginForm({ overrideEnabled }: { overrideEnabled: boolean }) {
   const [state, action, pending] = useActionState(login, undefined);
   return (
     <Card className="w-full max-w-sm">
@@ -15,7 +16,15 @@ export function LoginForm() {
         <CardTitle className="text-lg">ClashDash</CardTitle>
         <CardDescription>{state?.requiresTotp ? "输入认证器中的六位验证码" : "mihomo 配置管理平台"}</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="grid gap-4">
+        {overrideEnabled && (
+          <Alert variant="destructive">
+            <AlertTitle>密码恢复模式已启用</AlertTitle>
+            <AlertDescription>
+              服务启动时已使用 ADMIN_OVERRIDE_PASSWORD 重置管理密码。登录后请移除该变量并重启服务。
+            </AlertDescription>
+          </Alert>
+        )}
         <form action={action} className="grid gap-4">
           {state?.requiresTotp ? (
             <div className="grid gap-2">

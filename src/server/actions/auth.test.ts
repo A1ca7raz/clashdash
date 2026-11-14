@@ -26,7 +26,7 @@ vi.mock("@/db", async () => {
 let db: Db;
 
 beforeEach(async () => {
-  process.env.ADMIN_PASSWORD = "initial-password";
+  process.env.ADMIN_INITIAL_PASSWORD = "initial-password";
   process.env.JWT_SECRET = "0123456789abcdef0123456789abcdef";
   mocks.cookies.clear();
   mocks.redirect.mockReset().mockImplementation((path: string) => {

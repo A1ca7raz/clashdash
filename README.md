@@ -21,11 +21,11 @@
 
 ```bash
 npm install
-cp .env.example .env.local   # 修改 ADMIN_PASSWORD / JWT_SECRET
+cp .env.example .env.local   # 修改 ADMIN_INITIAL_PASSWORD / JWT_SECRET
 npm run dev
 ```
 
-不设置 `DATABASE_URL` 时使用内嵌的 PGlite（数据保存在 `.data/pglite`，首次启动自动迁移），无需安装数据库。打开 http://localhost:3000 用 `ADMIN_PASSWORD` 完成首次登录。密码初始化后保存在数据库中，之后可在设置页修改；再修改环境变量不会覆盖数据库密码。
+不设置 `DATABASE_URL` 时使用内嵌的 PGlite（数据保存在 `.data/pglite`，首次启动自动迁移），无需安装数据库。打开 http://localhost:3000 用 `ADMIN_INITIAL_PASSWORD` 完成首次登录。密码初始化后保存在数据库中，之后可在设置页修改；再修改环境变量不会覆盖数据库密码。
 
 常用命令：
 
@@ -52,17 +52,24 @@ npm run dev
    | 变量 | 说明 |
    | --- | --- |
    | `DATABASE_URL` | Postgres 连接串（`*.neon.tech` 自动使用 Neon serverless 驱动） |
-   | `ADMIN_PASSWORD` | 管理员首次初始化密码；初始化后不再作为登录密码覆盖来源 |
+   | `ADMIN_INITIAL_PASSWORD` | 仅在首次初始化管理员时使用；初始化后修改此变量不会影响已有密码 |
+   | `ADMIN_OVERRIDE_PASSWORD` | 可选的恢复变量；服务启动时重置密码、删除 TOTP 并使旧会话失效，恢复后必须移除并重启 |
    | `JWT_SECRET` | 会话签名密钥，至少 32 位随机字符 |
-   | `CRON_SECRET` | 定时任务密钥，Vercel Cron 会以 `Authorization: Bearer` 发送 |
+   | `CRON_SECRET` | 手动定时任务密钥，调用方以 `Authorization: Bearer` 发送 |
 
-4. 部署。`vercel.json` 中配置了每天一次的定时刷新（Hobby 计划的上限）；此外客户端拉取订阅链接时，超过缓存时长的订阅会按需刷新（单次最多等待 8 秒，失败则沿用上次的节点）。
+4. 部署。项目不自动注册 Vercel Cron；需要定时刷新时，请使用自己的调度任务携带密钥请求 `/api/cron/refresh`：
+
+   ```bash
+   curl -H "Authorization: Bearer $CRON_SECRET" https://your-domain.example/api/cron/refresh
+   ```
+
+   此外客户端拉取订阅链接时，超过缓存时长的订阅会按需刷新（单次最多等待 8 秒，失败则沿用上次的节点）。
 
 ### 注意
 
 - 部分机场会屏蔽 Vercel 等数据中心 IP，导致服务端拉取失败。此时把该订阅切换为 `provider` 模式，由客户端直接拉取上游。
 - 订阅链接即凭据，泄露后可在方案页「重置链接」。
-- 丢失认证器时，停止服务后设置一个临时的 `ADMIN_PASSWORD`，在数据库中执行 `DELETE FROM admin_auth WHERE id = 1;`，并轮换 `JWT_SECRET`。重新启动后可使用临时密码重新初始化；轮换签名密钥会使旧会话全部失效。
+- 忘记密码或丢失认证器时，设置临时的 `ADMIN_OVERRIDE_PASSWORD` 并重启服务，再用该密码登录。启动恢复会同时删除 TOTP 并使旧会话失效；登录后应移除变量并再次重启，避免每次启动重复重置。
 - 已知遗留：密码和 TOTP 登录接口暂未实现限流；公网部署时应通过平台或反向代理限制请求频率。
 
 ## 技术栈

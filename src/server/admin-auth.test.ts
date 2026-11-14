@@ -6,6 +6,7 @@ import { createDb } from "@/db/client";
 import { adminAuth } from "@/db/schema";
 import { exportAll, importAll } from "@/server/backup";
 import {
+  applyAdminPasswordOverride,
   changeAdminPassword,
   confirmTotpEnrollment,
   disableAdminTotp,
@@ -17,16 +18,20 @@ import {
 } from "./admin-auth";
 
 let db: Db;
-const oldPassword = process.env.ADMIN_PASSWORD;
+const oldPassword = process.env.ADMIN_INITIAL_PASSWORD;
+const oldOverridePassword = process.env.ADMIN_OVERRIDE_PASSWORD;
 
 beforeEach(async () => {
-  process.env.ADMIN_PASSWORD = "initial-password";
+  process.env.ADMIN_INITIAL_PASSWORD = "initial-password";
+  delete process.env.ADMIN_OVERRIDE_PASSWORD;
   db = await createDb("memory://");
 }, 60_000);
 
 afterEach(() => {
-  if (oldPassword === undefined) delete process.env.ADMIN_PASSWORD;
-  else process.env.ADMIN_PASSWORD = oldPassword;
+  if (oldPassword === undefined) delete process.env.ADMIN_INITIAL_PASSWORD;
+  else process.env.ADMIN_INITIAL_PASSWORD = oldPassword;
+  if (oldOverridePassword === undefined) delete process.env.ADMIN_OVERRIDE_PASSWORD;
+  else process.env.ADMIN_OVERRIDE_PASSWORD = oldOverridePassword;
 });
 
 describe("admin authentication", () => {
@@ -36,7 +41,7 @@ describe("admin authentication", () => {
     expect(await verifyPasswordHash("initial-password", row.passwordHash)).toBe(true);
     expect(await verifyPasswordHash("wrong", row.passwordHash)).toBe(false);
 
-    process.env.ADMIN_PASSWORD = "changed-environment";
+    process.env.ADMIN_INITIAL_PASSWORD = "changed-environment";
     expect((await verifyAdminPassword(db, "initial-password"))?.id).toBe(1);
     expect(await verifyAdminPassword(db, "changed-environment")).toBeNull();
   });
@@ -46,6 +51,30 @@ describe("admin authentication", () => {
     expect(await verifyAdminPassword(db, "initial-password")).toBeNull();
     expect((await verifyAdminPassword(db, "new-password"))?.authVersion).toBe(2);
     await expect(changeAdminPassword(db, "wrong", "another-password", "")).rejects.toThrow("当前密码错误");
+  });
+
+  it("overrides the password, clears TOTP, and invalidates previous sessions on each startup", async () => {
+    await ensureAdminAuth(db);
+    await db
+      .update(adminAuth)
+      .set({ totpSecret: "enabled-secret", totpPendingSecret: "pending-secret", totpLastCounter: 42 })
+      .where(eq(adminAuth.id, 1));
+    process.env.ADMIN_OVERRIDE_PASSWORD = "recovery-password";
+    await expect(applyAdminPasswordOverride(db)).resolves.toBe(true);
+    expect(await verifyAdminPassword(db, "initial-password")).toBeNull();
+    const recovered = await verifyAdminPassword(db, "recovery-password");
+    expect(recovered).toMatchObject({
+      authVersion: 2,
+      totpSecret: null,
+      totpPendingSecret: null,
+      totpLastCounter: null,
+    });
+
+    await expect(applyAdminPasswordOverride(db)).resolves.toBe(true);
+    expect((await verifyAdminPassword(db, "recovery-password"))?.authVersion).toBe(3);
+    delete process.env.ADMIN_OVERRIDE_PASSWORD;
+    await expect(applyAdminPasswordOverride(db)).resolves.toBe(false);
+    expect((await ensureAdminAuth(db)).authVersion).toBe(3);
   });
 
   it("enrolls TOTP, prevents token replay and disables it", async () => {
