@@ -11,7 +11,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   try {
     const { token } = await params;
     const db = await getDb();
-    const [profile] = await db.select().from(profiles).where(eq(profiles.token, token)).limit(1);
+    const [profile] = await db
+      .update(profiles)
+      .set({ lastPulledAt: new Date() })
+      .where(eq(profiles.token, token))
+      .returning();
     if (!profile) return new Response("Not Found", { status: 404 });
 
     const { input, result } = await generateForProfile(db, profile);

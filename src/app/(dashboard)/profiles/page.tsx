@@ -34,6 +34,7 @@ export default async function ProfilesPage() {
         id: p.id,
         name: p.name,
         token: p.token,
+        lastPulledAt: p.lastPulledAt?.toISOString() ?? null,
         subscriptionCount: subscriptionCount[p.id] ?? 0,
         listenerCount: listenerCount[p.id] ?? 0,
       }))}

@@ -1,6 +1,6 @@
 "use client";
 
-import { CopyIcon, PlusIcon } from "lucide-react";
+import { CopyIcon, PencilIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -17,13 +17,16 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRun } from "@/components/use-run";
+import { formatDateTime, formatRelative } from "@/lib/format";
 import { createProfile, deleteProfiles, duplicateProfile } from "@/server/actions/profiles";
 
 interface ProfileSummary {
   id: number;
   name: string;
   token: string;
+  lastPulledAt: string | null;
   subscriptionCount: number;
   listenerCount: number;
 }
@@ -121,7 +124,8 @@ function ProfileCard({
           </Link>
         </CardTitle>
         <CardDescription>
-          {profile.subscriptionCount} 个订阅 · {groupCount} 个代理组 · {ruleCount} 条规则 · {profile.listenerCount} 个监听器
+          {profile.subscriptionCount} 个订阅 · {groupCount} 个代理组 · {ruleCount} 条规则 · {profile.listenerCount} 个监听器 ·{" "}
+          <LastPulled value={profile.lastPulledAt} />
         </CardDescription>
         <CardAction className="flex items-center gap-1">
           <Button
@@ -134,8 +138,10 @@ function ProfileCard({
           >
             <CopyIcon />
           </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={`/profiles/${profile.id}`}>编辑</Link>
+          <Button variant="ghost" size="icon-sm" title="编辑" aria-label={`编辑配置方案「${profile.name}」`} asChild>
+            <Link href={`/profiles/${profile.id}`}>
+              <PencilIcon />
+            </Link>
           </Button>
         </CardAction>
       </CardHeader>
@@ -143,6 +149,19 @@ function ProfileCard({
         <MaskedSubscriptionLink value={link} />
       </CardContent>
     </Card>
+  );
+}
+
+function LastPulled({ value }: { value: string | null }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <time dateTime={value ?? undefined} className="cursor-help">
+          {formatRelative(value)}拉取
+        </time>
+      </TooltipTrigger>
+      <TooltipContent>{value ? formatDateTime(value) : "从未拉取"}</TooltipContent>
+    </Tooltip>
   );
 }
 

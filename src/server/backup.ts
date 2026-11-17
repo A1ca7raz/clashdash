@@ -47,7 +47,7 @@ const SQL_NAMES: Partial<Record<TableKey, string>> = {
   listeners: "listeners",
 };
 
-const DATE_FIELDS = ["createdAt", "updatedAt", "lastAttemptAt", "lastFetchedAt", "refreshingAt"];
+const DATE_FIELDS = ["createdAt", "updatedAt", "lastAttemptAt", "lastFetchedAt", "lastPulledAt", "refreshingAt"];
 const rowSchema = z.record(z.string(), z.unknown());
 const backupSchema = z.object({
   version: z.union([z.literal(1), z.literal(2), z.literal(3)]),

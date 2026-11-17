@@ -70,6 +70,7 @@ export const profiles = pgTable("profiles", {
   sort: integer("sort").notNull().default(0),
   createdAt: createdAt(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  lastPulledAt: timestamp("last_pulled_at", { withTimezone: true }),
 });
 
 export const pointers = pgTable("pointers", {
