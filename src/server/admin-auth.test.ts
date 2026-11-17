@@ -47,6 +47,7 @@ describe("admin authentication", () => {
   });
 
   it("changes the password and increments the session version", async () => {
+    await ensureAdminAuth(db);
     expect(await changeAdminPassword(db, "initial-password", "new-password", "")).toBe(2);
     expect(await verifyAdminPassword(db, "initial-password")).toBeNull();
     expect((await verifyAdminPassword(db, "new-password"))?.authVersion).toBe(2);
@@ -78,6 +79,7 @@ describe("admin authentication", () => {
   });
 
   it("enrolls TOTP, prevents token replay and disables it", async () => {
+    await ensureAdminAuth(db);
     const enrollment = await startTotpEnrollment(db, "initial-password");
     expect(enrollment.uri).toContain("otpauth://totp/");
     expect((await ensureAdminAuth(db)).totpSecret).toBeNull();

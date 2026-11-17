@@ -1,11 +1,13 @@
 import "server-only";
 import { ZodError } from "zod";
 import { getDb, type Db } from "@/db";
+import { isDatabaseInitializationRequired } from "@/db/errors";
 import { requireAuth } from "@/server/auth";
 
 export type ActionResult<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
 
 function friendly(err: unknown): string {
+  if (isDatabaseInitializationRequired(err)) return "数据库需要初始化，请前往登录页完成初始化";
   if (err instanceof ZodError) return err.issues.map((i) => `${i.path.join(".") || "输入"}：${i.message}`).join("；");
   const e = err as { code?: string; message?: string; cause?: { code?: string; message?: string } };
   const code = e.code ?? e.cause?.code;

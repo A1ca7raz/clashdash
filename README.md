@@ -15,11 +15,7 @@ ClashDash 是一个单用户 mihomo 配置管理平台，用于管理订阅、�
 
    编辑 `.env.local`，设置 `ADMIN_INITIAL_PASSWORD` 和 `JWT_SECRET`；其余变量按需要填写。
 
-2. 默认使用 PGlite，无需安装数据库，启动时自动迁移。生产环境应持久化 `.data` 目录。若使用 Postgres，请设置 `DATABASE_URL` 并执行：
-
-   ```bash
-   npm run db:migrate
-   ```
+2. 默认使用 PGlite，无需安装数据库，启动时自动迁移。生产环境应持久化 `.data` 目录。若使用 Postgres，请设置 `DATABASE_URL`；全空数据库会在首次登录验证初始密码后自动迁移，也可提前执行 `npm run db:migrate`。
 
 3. 构建并启动：
 
@@ -33,7 +29,7 @@ Node.js 部署会自动运行内建 Cron，每 30 秒检查一次，并按各订
 ### Vercel
 
 1. 创建 Postgres 数据库，在 Vercel 项目中配置 `DATABASE_URL`、`ADMIN_INITIAL_PASSWORD` 和 `JWT_SECRET`。
-2. 在本地或 CI 中执行数据库迁移：
+2. 全空数据库可在首次登录时自动初始化，也可提前在本地或 CI 中执行：
 
    ```bash
    DATABASE_URL="postgres://..." npm run db:migrate
@@ -47,7 +43,7 @@ Vercel 不运行内建 Cron。如需定时刷新，请设置 `CRON_SECRET`，并
 curl -H "Authorization: Bearer $CRON_SECRET" https://your-domain.example/api/cron/refresh
 ```
 
-客户端拉取配置时只读取已保存的节点快照，不会临时拉取上游订阅。
+客户端拉取配置时只读取已保存的节点快照，不会临时拉取上游订阅。任何表缺失都会进入初始化流程，但仅全空数据库会自动迁移；部分缺表需要人工修复，不会被自动改写。
 
 ## 开发环境
 

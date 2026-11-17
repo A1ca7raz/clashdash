@@ -40,6 +40,78 @@ export async function createProfile(input: { name: string }) {
   });
 }
 
+export async function duplicateProfile(id: number) {
+  return run(async (db) => {
+    const createdId = await db.transaction(async (tx) => {
+      const [source] = await tx.select().from(profiles).where(eq(profiles.id, id));
+      if (!source) throw new Error("配置方案不存在");
+      const taken = new Set((await tx.select({ name: profiles.name }).from(profiles)).map((profile) => profile.name));
+      let name = `${source.name} 副本`;
+      for (let i = 2; taken.has(name); i++) name = `${source.name} 副本 ${i}`;
+      const [created] = await tx
+        .insert(profiles)
+        .values({
+          name,
+          token: newToken(),
+          baseConfig: source.baseConfig,
+          updateInterval: source.updateInterval,
+          sort: await tx.$count(profiles),
+        })
+        .returning({ id: profiles.id });
+
+      const subscriptionRows = await tx.select().from(profileSubscriptions).where(eq(profileSubscriptions.profileId, id));
+      if (subscriptionRows.length) {
+        await tx.insert(profileSubscriptions).values(subscriptionRows.map((row) => ({ ...row, profileId: created.id })));
+      }
+      const nodeRows = await tx.select().from(profileManualNodes).where(eq(profileManualNodes.profileId, id));
+      if (nodeRows.length) {
+        await tx.insert(profileManualNodes).values(nodeRows.map((row) => ({ ...row, profileId: created.id })));
+      }
+      const listenerRows = await tx.select().from(profileListeners).where(eq(profileListeners.profileId, id));
+      if (listenerRows.length) {
+        await tx.insert(profileListeners).values(listenerRows.map((row) => ({ ...row, profileId: created.id })));
+      }
+
+      const groupRows = await tx.select().from(proxyGroups).where(eq(proxyGroups.profileId, id));
+      for (const group of groupRows) {
+        const [groupCopy] = await tx
+          .insert(proxyGroups)
+          .values({
+            profileId: created.id,
+            name: group.name,
+            type: group.type,
+            options: group.options,
+            members: group.members,
+            yaml: group.yaml,
+            sort: group.sort,
+          })
+          .returning({ id: proxyGroups.id });
+        await syncPointerReferences(tx, "group", groupCopy.id, group.yaml);
+      }
+      const ruleRows = await tx.select().from(rules).where(eq(rules.profileId, id));
+      if (ruleRows.length) {
+        await tx.insert(rules).values(
+          ruleRows.map((rule) => ({
+            profileId: created.id,
+            subRule: rule.subRule,
+            type: rule.type,
+            payload: rule.payload,
+            target: rule.target,
+            noResolve: rule.noResolve,
+            enabled: rule.enabled,
+            remark: rule.remark,
+            sort: rule.sort,
+          })),
+        );
+      }
+      await syncPointerReferences(tx, "profile", created.id, source.baseConfig);
+      return created.id;
+    });
+    done();
+    return createdId;
+  });
+}
+
 const settingsSchema = z.object({
   id: z.number().int(),
   name: z.string().trim().min(1, "名称不能为空"),

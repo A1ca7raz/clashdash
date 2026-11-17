@@ -4,8 +4,17 @@ import { jwtVerify } from "jose/jwt/verify";
 /** Edge-safe session helpers, shared by middleware and server code. */
 export const SESSION_COOKIE = "clashdash_session";
 export const TOTP_CHALLENGE_COOKIE = "clashdash_totp_challenge";
-export const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 export const TOTP_CHALLENGE_MAX_AGE = 60 * 5;
+
+const DEFAULT_SESSION_MAX_AGE = 60 * 60 * 24;
+
+export function sessionMaxAge(): number {
+  const raw = process.env.JWT_SESSION_TTL;
+  if (!raw) return DEFAULT_SESSION_MAX_AGE;
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value <= 0) throw new Error("JWT_SESSION_TTL 必须是正整数（秒）");
+  return value;
+}
 
 export interface SessionPayload {
   authVersion: number;
@@ -21,7 +30,7 @@ export function createSessionToken(authVersion = 1): Promise<string> {
   return new SignJWT({ sub: "admin", typ: "session", ver: authVersion })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(`${SESSION_MAX_AGE}s`)
+    .setExpirationTime(`${sessionMaxAge()}s`)
     .sign(secret());
 }
 

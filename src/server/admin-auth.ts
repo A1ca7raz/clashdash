@@ -5,6 +5,7 @@ import { and, eq, isNull, lt, or } from "drizzle-orm";
 import { generateSecret, generateURI, verify } from "otplib";
 import type { Db } from "@/db";
 import { adminAuth, type AdminAuth } from "@/db/schema";
+import { DatabaseInitializationRequired } from "@/db/errors";
 
 const scryptAsync = promisify(scrypt);
 const ADMIN_ID = 1;
@@ -30,14 +31,19 @@ export async function verifyPasswordHash(password: string, encoded: string): Pro
   }
 }
 
+export async function findAdminAuth(db: Db): Promise<AdminAuth | null> {
+  const [row] = await db.select().from(adminAuth).where(eq(adminAuth.id, ADMIN_ID));
+  return row ?? null;
+}
+
 export async function ensureAdminAuth(db: Db): Promise<AdminAuth> {
-  const [existing] = await db.select().from(adminAuth).where(eq(adminAuth.id, ADMIN_ID));
+  const existing = await findAdminAuth(db);
   if (existing) return existing;
   const initialPassword = process.env.ADMIN_INITIAL_PASSWORD;
   if (!initialPassword) throw new Error("管理员尚未初始化，请设置 ADMIN_INITIAL_PASSWORD");
   const passwordHash = await hashPassword(initialPassword);
   await db.insert(adminAuth).values({ id: ADMIN_ID, passwordHash }).onConflictDoNothing();
-  const [row] = await db.select().from(adminAuth).where(eq(adminAuth.id, ADMIN_ID));
+  const row = await findAdminAuth(db);
   if (!row) throw new Error("管理员初始化失败");
   return row;
 }
@@ -45,7 +51,8 @@ export async function ensureAdminAuth(db: Db): Promise<AdminAuth> {
 export async function applyAdminPasswordOverride(db: Db): Promise<boolean> {
   const password = process.env.ADMIN_OVERRIDE_PASSWORD;
   if (!password) return false;
-  const row = await ensureAdminAuth(db);
+  const row = await findAdminAuth(db);
+  if (!row) throw new DatabaseInitializationRequired("admin");
   const passwordHash = await hashPassword(password);
   await db
     .update(adminAuth)
@@ -62,7 +69,8 @@ export async function applyAdminPasswordOverride(db: Db): Promise<boolean> {
 }
 
 export async function verifyAdminPassword(db: Db, password: string): Promise<AdminAuth | null> {
-  const row = await ensureAdminAuth(db);
+  const row = await findAdminAuth(db);
+  if (!row) throw new DatabaseInitializationRequired("admin");
   return (await verifyPasswordHash(password, row.passwordHash)) ? row : null;
 }
 

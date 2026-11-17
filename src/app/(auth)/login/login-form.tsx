@@ -8,16 +8,47 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { login } from "@/server/actions/auth";
 
-export function LoginForm({ overrideEnabled }: { overrideEnabled: boolean }) {
+export function LoginForm({
+  overrideEnabled,
+  initialization,
+  initialPasswordConfigured,
+  databaseError,
+}: {
+  overrideEnabled: boolean;
+  initialization: "schema" | "admin" | null;
+  initialPasswordConfigured: boolean;
+  databaseError?: string;
+}) {
   const [state, action, pending] = useActionState(login, undefined);
+  const unavailable = !!databaseError || (!!initialization && !initialPasswordConfigured);
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
         <CardTitle className="text-lg">ClashDash</CardTitle>
-        <CardDescription>{state?.requiresTotp ? "输入认证器中的六位验证码" : "mihomo 配置管理平台"}</CardDescription>
+        <CardDescription>
+          {state?.requiresTotp ? "输入认证器中的六位验证码" : initialization ? "首次部署数据库初始化" : "mihomo 配置管理平台"}
+        </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
-        {overrideEnabled && (
+        {databaseError && (
+          <Alert variant="destructive">
+            <AlertTitle>数据库不可用</AlertTitle>
+            <AlertDescription>{databaseError}</AlertDescription>
+          </Alert>
+        )}
+        {initialization && !initialPasswordConfigured && (
+          <Alert variant="destructive">
+            <AlertTitle>无法初始化数据库</AlertTitle>
+            <AlertDescription>请先设置 ADMIN_INITIAL_PASSWORD，再刷新本页面。</AlertDescription>
+          </Alert>
+        )}
+        {initialization && initialPasswordConfigured && (
+          <Alert>
+            <AlertTitle>需要初始化</AlertTitle>
+            <AlertDescription>输入 ADMIN_INITIAL_PASSWORD。验证通过后才会检查并初始化数据库，部分缺表不会被自动修复。</AlertDescription>
+          </Alert>
+        )}
+        {overrideEnabled && !initialization && (
           <Alert variant="destructive">
             <AlertTitle>密码恢复模式已启用</AlertTitle>
             <AlertDescription>
@@ -26,6 +57,7 @@ export function LoginForm({ overrideEnabled }: { overrideEnabled: boolean }) {
           </Alert>
         )}
         <form action={action} className="grid gap-4">
+          {initialization && <input type="hidden" name="initialization" value={initialization} />}
           {state?.requiresTotp ? (
             <div className="grid gap-2">
               <Label htmlFor="token">两步验证码</Label>
@@ -42,13 +74,21 @@ export function LoginForm({ overrideEnabled }: { overrideEnabled: boolean }) {
             </div>
           ) : (
             <div className="grid gap-2">
-              <Label htmlFor="password">管理密码</Label>
-              <Input id="password" name="password" type="password" autoFocus required autoComplete="current-password" />
+              <Label htmlFor="password">{initialization ? "初始管理密码" : "管理密码"}</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoFocus
+                required
+                disabled={unavailable}
+                autoComplete="current-password"
+              />
             </div>
           )}
           {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
-          <Button type="submit" disabled={pending}>
-            {pending ? "登录中…" : state?.requiresTotp ? "验证并登录" : "登录"}
+          <Button type="submit" disabled={pending || unavailable}>
+            {pending ? (initialization ? "初始化中…" : "登录中…") : state?.requiresTotp ? "验证并登录" : initialization ? "初始化并登录" : "登录"}
           </Button>
         </form>
       </CardContent>

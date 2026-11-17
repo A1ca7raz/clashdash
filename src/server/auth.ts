@@ -6,12 +6,13 @@ import {
   createSessionToken,
   createTotpChallenge,
   SESSION_COOKIE,
-  SESSION_MAX_AGE,
+  sessionMaxAge,
   TOTP_CHALLENGE_COOKIE,
   TOTP_CHALLENGE_MAX_AGE,
   verifySessionToken,
 } from "@/lib/session";
-import { ensureAdminAuth } from "@/server/admin-auth";
+import { DatabaseInitializationRequired } from "@/db/errors";
+import { findAdminAuth } from "@/server/admin-auth";
 
 const cookieOptions = {
   httpOnly: true,
@@ -25,14 +26,15 @@ export async function requireAuth(): Promise<AdminAuth> {
   const store = await cookies();
   const session = await verifySessionToken(store.get(SESSION_COOKIE)?.value);
   if (!session) throw new Error("未登录或会话已过期");
-  const row = await ensureAdminAuth(await getDb());
+  const row = await findAdminAuth(await getDb());
+  if (!row) throw new DatabaseInitializationRequired("admin");
   if (row.authVersion !== session.authVersion) throw new Error("登录状态已失效，请重新登录");
   return row;
 }
 
 export async function setSessionCookie(authVersion: number) {
   const store = await cookies();
-  store.set(SESSION_COOKIE, await createSessionToken(authVersion), { ...cookieOptions, maxAge: SESSION_MAX_AGE });
+  store.set(SESSION_COOKIE, await createSessionToken(authVersion), { ...cookieOptions, maxAge: sessionMaxAge() });
   store.delete(TOTP_CHALLENGE_COOKIE);
 }
 

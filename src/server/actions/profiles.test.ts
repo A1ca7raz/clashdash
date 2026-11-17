@@ -1,9 +1,21 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "@/db";
-import { listeners, profileListeners, profileSubscriptions, profiles, proxyGroups, rules, subscriptions } from "@/db/schema";
+import {
+  listeners,
+  nodes,
+  pointerReferences,
+  pointers,
+  profileListeners,
+  profileManualNodes,
+  profileSubscriptions,
+  profiles,
+  proxyGroups,
+  rules,
+  subscriptions,
+} from "@/db/schema";
 import { createDb } from "@/db/client";
-import { deleteProfiles, saveGroup, saveRule } from "./profiles";
+import { deleteProfiles, duplicateProfile, saveGroup, saveRule } from "./profiles";
 
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("@/server/auth", () => ({ requireAuth: async () => {} }));
@@ -152,6 +164,51 @@ describe("saveRule", () => {
       ["DIVIDER", "tail", "", 1],
       ["MATCH", "", "REJECT", 2],
     ]);
+  });
+});
+
+describe("duplicateProfile", () => {
+  it("copies private data and shared associations with a new name and token", async () => {
+    const [pointer] = await db.insert(pointers).values({ name: "shared", value: "secret" }).returning();
+    await db.update(profiles).set({ baseConfig: "password: *shared", updateInterval: 12 }).where(eq(profiles.id, profileId));
+    const [node] = await db.insert(nodes).values({ name: "Node", type: "ss", config: { name: "Node", type: "ss" } }).returning();
+    const [listener] = await db.insert(listeners).values({ name: "Shared", type: "mixed", port: 7890 }).returning();
+    await db.insert(profileManualNodes).values({ profileId, nodeId: node.id, sort: 0 });
+    await db.insert(profileListeners).values({ profileId, listenerId: listener.id, sort: 0 });
+    await db.insert(proxyGroups).values({
+      profileId,
+      name: "Private",
+      members: { items: [], sources: { all: false, subscriptions: [subscriptionId], manual: true } },
+      yaml: "name: Private",
+    });
+    await db.insert(rules).values({ profileId, type: "MATCH", payload: "", target: "Private" });
+
+    const result = await duplicateProfile(profileId);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const [copy] = await db.select().from(profiles).where(eq(profiles.id, result.data));
+    expect(copy).toMatchObject({ name: "Main 副本", baseConfig: "password: *shared", updateInterval: 12 });
+    expect(copy.token).not.toBe("main");
+
+    expect(await db.select().from(profileSubscriptions).where(eq(profileSubscriptions.profileId, copy.id))).toHaveLength(1);
+    expect(await db.select().from(profileManualNodes).where(eq(profileManualNodes.profileId, copy.id))).toHaveLength(1);
+    expect(await db.select().from(profileListeners).where(eq(profileListeners.profileId, copy.id))).toHaveLength(1);
+    expect(await db.$count(nodes)).toBe(1);
+    expect(await db.$count(listeners)).toBe(1);
+
+    const copiedGroups = await db.select().from(proxyGroups).where(eq(proxyGroups.profileId, copy.id));
+    expect(copiedGroups).toHaveLength(1);
+    expect(copiedGroups[0].name).toBe("Private");
+    expect(await db.select().from(rules).where(eq(rules.profileId, copy.id))).toHaveLength(1);
+    expect(
+      await db
+        .select()
+        .from(pointerReferences)
+        .where(and(eq(pointerReferences.resourceType, "profile"), eq(pointerReferences.resourceId, copy.id))),
+    ).toEqual([{ pointerId: pointer.id, resourceType: "profile", resourceId: copy.id }]);
+
+    expect((await duplicateProfile(profileId)).ok).toBe(true);
+    expect(await db.select({ name: profiles.name }).from(profiles).where(eq(profiles.name, "Main 副本 2"))).toHaveLength(1);
   });
 });
 

@@ -32,7 +32,7 @@ export function ResourcesTab() {
   return (
     <div className="grid gap-6">
       <section className="grid gap-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="grid gap-1">
             <h2 className="text-sm font-medium">订阅、节点与监听器</h2>
             <p className="text-sm text-muted-foreground">选择写入方案的资源，拖动调整输出顺序。</p>

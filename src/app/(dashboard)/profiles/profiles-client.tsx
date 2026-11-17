@@ -1,6 +1,6 @@
 "use client";
 
-import { PlusIcon } from "lucide-react";
+import { CopyIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRun } from "@/components/use-run";
-import { createProfile, deleteProfiles } from "@/server/actions/profiles";
+import { createProfile, deleteProfiles, duplicateProfile } from "@/server/actions/profiles";
 
 interface ProfileSummary {
   id: number;
@@ -104,11 +104,18 @@ function ProfileCard({
   batch: BatchManagement;
   pending: boolean;
 }) {
+  const [duplicating, run] = useRun();
   const link = `${origin}/api/sub/${profile.token}`;
   return (
     <Card data-state={batch.selectedIds.has(profile.id) ? "selected" : undefined}>
       <CardHeader>
-        <CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <BatchSelectionCheckbox
+            label={`选择配置方案「${profile.name}」`}
+            checked={batch.selectedIds.has(profile.id)}
+            disabled={pending}
+            onToggle={() => batch.toggle(profile.id)}
+          />
           <Link href={`/profiles/${profile.id}`} className="hover:underline">
             {profile.name}
           </Link>
@@ -117,12 +124,16 @@ function ProfileCard({
           {profile.subscriptionCount} 个订阅 · {groupCount} 个代理组 · {ruleCount} 条规则 · {profile.listenerCount} 个监听器
         </CardDescription>
         <CardAction className="flex items-center gap-1">
-          <BatchSelectionCheckbox
-            label={`选择配置方案「${profile.name}」`}
-            checked={batch.selectedIds.has(profile.id)}
-            disabled={pending}
-            onToggle={() => batch.toggle(profile.id)}
-          />
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title="创建副本"
+            aria-label={`创建配置方案「${profile.name}」的副本`}
+            disabled={pending || duplicating}
+            onClick={() => run(() => duplicateProfile(profile.id), { success: "已创建副本" })}
+          >
+            <CopyIcon />
+          </Button>
           <Button variant="ghost" size="sm" asChild>
             <Link href={`/profiles/${profile.id}`}>编辑</Link>
           </Button>

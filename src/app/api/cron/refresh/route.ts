@@ -1,4 +1,5 @@
 import { getDb } from "@/db";
+import { isDatabaseInitializationRequired } from "@/db/errors";
 import { refreshMany } from "@/server/fetcher";
 
 export const runtime = "nodejs";
@@ -9,7 +10,12 @@ export async function GET(req: Request) {
   if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
-  const db = await getDb();
-  const results = await refreshMany(db, "all", { force: true });
-  return Response.json({ refreshed: results.length, failed: results.filter((r) => !r.ok) });
+  try {
+    const db = await getDb();
+    const results = await refreshMany(db, "all", { force: true });
+    return Response.json({ refreshed: results.length, failed: results.filter((r) => !r.ok) });
+  } catch (err) {
+    if (isDatabaseInitializationRequired(err)) return Response.json({ error: "database initialization required" }, { status: 503 });
+    throw err;
+  }
 }

@@ -1,11 +1,21 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
+import type { PGlite } from "@electric-sql/pglite";
+import { guardDatabaseClient } from "./guard";
+import { guardDb } from "./guard-db";
 import * as schema from "./schema";
 
 export type Db = PgDatabase<PgQueryResultHKT, typeof schema>;
 
 const migrationsFolder = path.join(process.cwd(), "drizzle");
+
+function guardPglite(client: PGlite): PGlite {
+  guardDatabaseClient(client);
+  const transaction = client.transaction.bind(client);
+  client.transaction = async (callback) => transaction(async (tx) => callback(guardDatabaseClient(tx)));
+  return client;
+}
 
 /**
  * `url` set: Neon (serverless driver) or any other Postgres (node-postgres).
@@ -18,11 +28,15 @@ export async function createDb(url: string | undefined, pgliteDir?: string): Pro
       const { drizzle } = await import("drizzle-orm/neon-serverless");
       const { default: ws } = await import("ws");
       neonConfig.webSocketConstructor = ws;
-      return drizzle({ client: new Pool({ connectionString: url }), schema }) as unknown as Db;
+      const pool = guardDatabaseClient(new Pool({ connectionString: url }));
+      pool.on("connect", guardDatabaseClient);
+      return guardDb(drizzle({ client: pool, schema })) as unknown as Db;
     }
     const { Pool } = await import("pg");
     const { drizzle } = await import("drizzle-orm/node-postgres");
-    return drizzle({ client: new Pool({ connectionString: url, max: 3 }), schema }) as unknown as Db;
+    const pool = guardDatabaseClient(new Pool({ connectionString: url, max: 3 }));
+    pool.on("connect", guardDatabaseClient);
+    return guardDb(drizzle({ client: pool, schema })) as unknown as Db;
   }
 
   if (process.env.VERCEL) {
@@ -41,7 +55,7 @@ export async function createDb(url: string | undefined, pgliteDir?: string): Pro
     await mkdir(dir, { recursive: true });
     client = new PGlite(dir);
   }
-  const db = drizzle({ client, schema });
+  const db = guardDb(drizzle({ client: guardPglite(client), schema }));
   await migrate(db, { migrationsFolder });
   return db as unknown as Db;
 }

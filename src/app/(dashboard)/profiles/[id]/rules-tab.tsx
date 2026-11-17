@@ -109,6 +109,7 @@ export function RulesTab() {
       ) : (
         <SortableList
           items={list}
+          className="rounded-lg border"
           onReorder={(ids) => run(() => reorder("rules", profile.id, ids))}
           renderItem={(r) => (
             <div className={`flex items-center gap-3 ${r.enabled || r.type === DIVIDER_RULE_TYPE ? "" : "opacity-50"}`}>

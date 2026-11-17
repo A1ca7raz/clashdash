@@ -48,7 +48,7 @@ export function CronMonitor({ initialStatus, unavailable }: { initialStatus: Sub
 
   return (
     <section className="grid gap-4 border-t pt-5">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-center justify-between gap-4">
         <div className="grid gap-1">
           <h2 className="text-sm font-medium">内建 Cron 监视器</h2>
           <p className="text-sm text-muted-foreground">每 5 秒自动更新，仅统计当前 Node.js 进程。</p>
