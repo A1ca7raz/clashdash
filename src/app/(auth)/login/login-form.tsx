@@ -95,7 +95,7 @@ export function LoginForm({
               />
             </div>
           )}
-          {showTurnstile && <div className="cf-turnstile" data-sitekey={turnstileSiteKey} />}
+          {showTurnstile && <div className="cf-turnstile" data-sitekey={turnstileSiteKey} data-action="login" />}
           {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
           <Button type="submit" disabled={pending || unavailable}>
             {pending ? (initialization ? "初始化中…" : "登录中…") : state?.requiresTotp ? "验证并登录" : initialization ? "初始化并登录" : "登录"}

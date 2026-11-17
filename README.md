@@ -47,7 +47,7 @@ curl -H "Authorization: Bearer $CRON_SECRET" https://your-domain.example/api/cro
 
 ## 安全说明
 
-- **登录保护**：可选接入 Cloudflare Turnstile（设置 `TURNSTILE_SITE_KEY` 与 `TURNSTILE_SECRET_KEY` 后登录需通过人机验证）。未配置 Turnstile 时登录接口没有硬性限流，仅 TOTP 步骤有失败次数限制（攻击者可重新提交密码绕过，属纵深防御），请为 `ADMIN_INITIAL_PASSWORD` 与管理密码选择高强度口令。
+- **登录保护**：可选接入 Cloudflare Turnstile（设置 `TURNSTILE_SITE_KEY` 与 `TURNSTILE_SECRET_KEY` 后登录需通过人机验证，服务端校验 siteverify 的 `success`、`action=login`，并可用 `TURNSTILE_HOSTNAMES` 限定接受的 hostname）。未配置 Turnstile 时登录接口没有硬性限流，仅 TOTP 步骤有失败次数限制（攻击者可重新提交密码绕过，属纵深防御），请为 `ADMIN_INITIAL_PASSWORD` 与管理密码选择高强度口令。
 - **密码找回**：`ADMIN_OVERRIDE_PASSWORD` 为一次性恢复变量。设置后首次启动/访问即重置管理密码并清除两步验证，随后整个服务进入锁定状态；移除该变量并重新部署/重启后，用该密码登录。请勿在数据库初始化完成前设置它。
 - **订阅抓取**：默认拒绝指向环回/内网/保留地址的订阅 URL（含重定向后的每一跳），响应体上限 10MB（`SUBSCRIPTION_MAX_BYTES` 可调）。订阅转换器部署在局域网时设置 `SUBSCRIPTION_ALLOW_PRIVATE_NETWORK=1` 放行。已知残余风险：域名在校验与连接之间可能被重新解析（DNS rebinding/TOCTOU）。
 - **响应头**：生产环境启用 CSP 等安全响应头；CSP 目前为 `script-src 'unsafe-inline'` 的折中策略，nonce 化严格 CSP 为后续工作。
