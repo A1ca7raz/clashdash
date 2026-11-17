@@ -3,6 +3,7 @@ import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import type { Db } from "@/db";
 import { nodes, subscriptions, type Subscription } from "@/db/schema";
 import { parseSubscription } from "@/lib/parser";
+import { fetchTextWithGuards } from "@/server/safe-fetch";
 import type { UserInfo } from "@/lib/types";
 
 export const DEFAULT_TIMEOUT_MS = 8000;
@@ -107,19 +108,15 @@ async function refreshSubscriptionInternal(
     }
 
     try {
-      const res = await fetch(sub.url, {
+      const { text, headers: resHeaders } = await fetchTextWithGuards(sub.url, {
         headers: { "User-Agent": sub.userAgent || "clash.meta" },
-        signal: AbortSignal.timeout(timeoutMs),
-        redirect: "follow",
-        cache: "no-store",
+        timeoutMs,
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const text = await res.text();
       const parsed = parseSubscription(text);
       if (parsed.nodes.length === 0) {
         throw new Error(parsed.errors[0] ?? "订阅中没有节点");
       }
-      const userinfo = parseUserInfo(res.headers.get("subscription-userinfo"));
+      const userinfo = parseUserInfo(resHeaders.get("subscription-userinfo"));
 
       let current: Subscription | undefined;
       const wrote = await db.transaction(async (tx) => {

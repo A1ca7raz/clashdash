@@ -1,6 +1,7 @@
 import { getDb } from "@/db";
 import { isDatabaseInitializationRequired } from "@/db/errors";
 import { refreshMany } from "@/server/fetcher";
+import { isOverrideLocked } from "@/server/override-lock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,6 +10,9 @@ export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+  if (await isOverrideLocked()) {
+    return Response.json({ error: "service locked: remove ADMIN_OVERRIDE_PASSWORD and redeploy" }, { status: 503 });
   }
   try {
     const db = await getDb();

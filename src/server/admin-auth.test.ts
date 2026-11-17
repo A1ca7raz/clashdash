@@ -54,7 +54,7 @@ describe("admin authentication", () => {
     await expect(changeAdminPassword(db, "wrong", "another-password", "")).rejects.toThrow("当前密码错误");
   });
 
-  it("overrides the password, clears TOTP, and invalidates previous sessions on each startup", async () => {
+  it("applies the override once, clears the marker after removal, and allows a later override", async () => {
     await ensureAdminAuth(db);
     await db
       .update(adminAuth)
@@ -70,12 +70,23 @@ describe("admin authentication", () => {
       totpPendingSecret: null,
       totpLastCounter: null,
     });
+    expect(recovered?.overrideResetAt).not.toBeNull();
 
+    // Repeated calls while the variable stays set are no-ops.
     await expect(applyAdminPasswordOverride(db)).resolves.toBe(true);
-    expect((await verifyAdminPassword(db, "recovery-password"))?.authVersion).toBe(3);
+    expect((await verifyAdminPassword(db, "recovery-password"))?.authVersion).toBe(2);
+
+    // Removing the variable clears the marker without touching the password.
     delete process.env.ADMIN_OVERRIDE_PASSWORD;
     await expect(applyAdminPasswordOverride(db)).resolves.toBe(false);
-    expect((await ensureAdminAuth(db)).authVersion).toBe(3);
+    const afterRemoval = await ensureAdminAuth(db);
+    expect(afterRemoval.authVersion).toBe(2);
+    expect(afterRemoval.overrideResetAt).toBeNull();
+
+    // A later override runs again.
+    process.env.ADMIN_OVERRIDE_PASSWORD = "recovery-password";
+    await expect(applyAdminPasswordOverride(db)).resolves.toBe(true);
+    expect((await verifyAdminPassword(db, "recovery-password"))?.authVersion).toBe(3);
   });
 
   it("enrolls TOTP, prevents token replay and disables it", async () => {

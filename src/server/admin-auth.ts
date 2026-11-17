@@ -1,7 +1,7 @@
 import "server-only";
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import { and, eq, isNull, lt, or } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lt, or } from "drizzle-orm";
 import { generateSecret, generateURI, verify } from "otplib";
 import type { Db } from "@/db";
 import { adminAuth, type AdminAuth } from "@/db/schema";
@@ -48,11 +48,20 @@ export async function ensureAdminAuth(db: Db): Promise<AdminAuth> {
   return row;
 }
 
+/**
+ * Applies ADMIN_OVERRIDE_PASSWORD exactly once per deployment of the variable: the reset and the
+ * `overrideResetAt` marker are written in a single UPDATE, and further calls are no-ops until the
+ * variable is removed (which clears the marker here) so a later override can run again.
+ */
 export async function applyAdminPasswordOverride(db: Db): Promise<boolean> {
   const password = process.env.ADMIN_OVERRIDE_PASSWORD;
-  if (!password) return false;
+  if (!password) {
+    await db.update(adminAuth).set({ overrideResetAt: null }).where(isNotNull(adminAuth.overrideResetAt));
+    return false;
+  }
   const row = await findAdminAuth(db);
   if (!row) throw new DatabaseInitializationRequired("admin");
+  if (row.overrideResetAt) return true;
   const passwordHash = await hashPassword(password);
   await db
     .update(adminAuth)
@@ -62,6 +71,7 @@ export async function applyAdminPasswordOverride(db: Db): Promise<boolean> {
       totpSecret: null,
       totpPendingSecret: null,
       totpLastCounter: null,
+      overrideResetAt: new Date(),
       updatedAt: new Date(),
     })
     .where(eq(adminAuth.id, ADMIN_ID));

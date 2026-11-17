@@ -60,7 +60,7 @@ describe("login action", () => {
 
     expect(await login(undefined, passwordForm())).toEqual({ requiresTotp: true });
     expect(mocks.cookies.has(SESSION_COOKIE)).toBe(false);
-    expect(await verifyTotpChallenge(mocks.cookies.get(TOTP_CHALLENGE_COOKIE))).toEqual({ authVersion: 2 });
+    expect(await verifyTotpChallenge(mocks.cookies.get(TOTP_CHALLENGE_COOKIE))).toEqual({ authVersion: 2, attempts: 0 });
 
     await db.update(adminAuth).set({ totpLastCounter: null }).where(eq(adminAuth.id, 1));
     const form = new FormData();
@@ -100,6 +100,7 @@ describe("login action", () => {
           "totp_secret" text,
           "totp_pending_secret" text,
           "totp_last_counter" integer,
+          "override_reset_at" timestamp with time zone,
           "updated_at" timestamp with time zone DEFAULT now() NOT NULL
         )
       `);

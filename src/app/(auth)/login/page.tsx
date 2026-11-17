@@ -1,6 +1,7 @@
 import { getDb } from "@/db";
 import { isDatabaseInitializationRequired } from "@/db/errors";
 import { findAdminAuth } from "@/server/admin-auth";
+import { turnstileSiteKey } from "@/server/turnstile";
 import { LoginForm } from "./login-form";
 
 export const dynamic = "force-dynamic";
@@ -18,10 +19,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <main className="flex min-h-svh items-center justify-center bg-muted/40 p-6">
       <LoginForm
-        overrideEnabled={Boolean(process.env.ADMIN_OVERRIDE_PASSWORD)}
         initialization={initialization}
         initialPasswordConfigured={Boolean(process.env.ADMIN_INITIAL_PASSWORD)}
         databaseError={databaseError}
+        turnstileSiteKey={turnstileSiteKey()}
       />
     </main>
   );

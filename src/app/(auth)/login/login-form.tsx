@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import Script from "next/script";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,21 +9,37 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { login } from "@/server/actions/auth";
 
+declare global {
+  interface Window {
+    turnstile?: { reset: () => void };
+  }
+}
+
 export function LoginForm({
-  overrideEnabled,
   initialization,
   initialPasswordConfigured,
   databaseError,
+  turnstileSiteKey,
 }: {
-  overrideEnabled: boolean;
   initialization: "schema" | "admin" | null;
   initialPasswordConfigured: boolean;
   databaseError?: string;
+  turnstileSiteKey?: string | null;
 }) {
   const [state, action, pending] = useActionState(login, undefined);
   const unavailable = !!databaseError || (!!initialization && !initialPasswordConfigured);
+  const showTurnstile = !!turnstileSiteKey && !state?.requiresTotp;
+
+  // A consumed Turnstile token cannot be reused; reset the widget after a failed submit.
+  useEffect(() => {
+    if (state?.error && showTurnstile) window.turnstile?.reset();
+  }, [state?.error, showTurnstile]);
+
   return (
     <Card className="w-full max-w-sm">
+      {showTurnstile && (
+        <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" strategy="afterInteractive" />
+      )}
       <CardHeader>
         <CardTitle className="text-lg">ClashDash</CardTitle>
         <CardDescription>
@@ -46,14 +63,6 @@ export function LoginForm({
           <Alert>
             <AlertTitle>需要初始化</AlertTitle>
             <AlertDescription>输入 ADMIN_INITIAL_PASSWORD。验证通过后才会检查并初始化数据库，部分缺表不会被自动修复。</AlertDescription>
-          </Alert>
-        )}
-        {overrideEnabled && !initialization && (
-          <Alert variant="destructive">
-            <AlertTitle>密码恢复模式已启用</AlertTitle>
-            <AlertDescription>
-              服务启动时已使用 ADMIN_OVERRIDE_PASSWORD 重置管理密码。登录后请移除该变量并重启服务。
-            </AlertDescription>
           </Alert>
         )}
         <form action={action} className="grid gap-4">
@@ -86,6 +95,7 @@ export function LoginForm({
               />
             </div>
           )}
+          {showTurnstile && <div className="cf-turnstile" data-sitekey={turnstileSiteKey} />}
           {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
           <Button type="submit" disabled={pending || unavailable}>
             {pending ? (initialization ? "初始化中…" : "登录中…") : state?.requiresTotp ? "验证并登录" : initialization ? "初始化并登录" : "登录"}

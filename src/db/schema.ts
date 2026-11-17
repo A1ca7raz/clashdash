@@ -219,6 +219,8 @@ export const adminAuth = pgTable("admin_auth", {
   totpSecret: text("totp_secret"),
   totpPendingSecret: text("totp_pending_secret"),
   totpLastCounter: integer("totp_last_counter"),
+  /** Set once when ADMIN_OVERRIDE_PASSWORD has been applied; cleared after the variable is removed. */
+  overrideResetAt: timestamp("override_reset_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

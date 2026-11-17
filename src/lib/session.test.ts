@@ -30,7 +30,7 @@ describe("session tokens", () => {
 
   it("keeps the TOTP preauthentication challenge separate", async () => {
     const challenge = await createTotpChallenge(7);
-    expect(await verifyTotpChallenge(challenge)).toEqual({ authVersion: 7 });
+    expect(await verifyTotpChallenge(challenge)).toEqual({ authVersion: 7, attempts: 0 });
     expect(await verifySessionToken(challenge)).toBeNull();
   });
 
@@ -46,5 +46,17 @@ describe("session tokens", () => {
       process.env.JWT_SESSION_TTL = value;
       expect(() => createSessionToken()).toThrow("JWT_SESSION_TTL 必须是正整数（秒）");
     }
+  });
+});
+
+describe("totp challenge attempts", () => {
+  it("carries the attempts counter", async () => {
+    expect(await verifyTotpChallenge(await createTotpChallenge(3, 4))).toEqual({ authVersion: 3, attempts: 4 });
+  });
+
+  it("rejects tampered tokens", async () => {
+    const token = await createTotpChallenge(3, 1);
+    const tampered = `${token.slice(0, -2)}aa`;
+    expect(await verifyTotpChallenge(tampered)).toBeNull();
   });
 });

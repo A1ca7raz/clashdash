@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 import { getDb, type Db } from "@/db";
 import { isDatabaseInitializationRequired } from "@/db/errors";
 import { requireAuth } from "@/server/auth";
+import { isOverrideLocked } from "@/server/override-lock";
 
 export type ActionResult<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -19,6 +20,9 @@ function friendly(err: unknown): string {
 /** Wraps an action body with the session check, a DB handle and uniform error reporting. */
 export async function run<T>(fn: (db: Db) => Promise<T>): Promise<ActionResult<T>> {
   try {
+    if (await isOverrideLocked()) {
+      throw new Error("服务处于密码重置锁定状态，请移除 ADMIN_OVERRIDE_PASSWORD 并重新部署/重启");
+    }
     await requireAuth();
     const db = await getDb();
     return { ok: true, data: await fn(db) };

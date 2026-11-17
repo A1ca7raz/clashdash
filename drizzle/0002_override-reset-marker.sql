@@ -1,0 +1,1 @@
+ALTER TABLE "admin_auth" ADD COLUMN "override_reset_at" timestamp with time zone;

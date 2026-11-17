@@ -9,7 +9,9 @@ import type { AdminAuth } from "@/db/schema";
 import { ensureAdminAuth, verifyAdminPassword, verifyTotpLogin } from "@/server/admin-auth";
 import { clearAuthCookies, setSessionCookie, setTotpChallengeCookie } from "@/server/auth";
 import { initializeEmptyDatabase } from "@/server/database-init";
-import { TOTP_CHALLENGE_COOKIE, verifyTotpChallenge } from "@/lib/session";
+import { isOverrideLocked } from "@/server/override-lock";
+import { verifyTurnstile } from "@/server/turnstile";
+import { TOTP_CHALLENGE_COOKIE, TOTP_CHALLENGE_MAX_ATTEMPTS, verifyTotpChallenge } from "@/lib/session";
 
 export interface LoginState {
   error?: string;
@@ -48,11 +50,10 @@ async function initialize(db: Db, reason: "schema" | "admin", password: string):
 }
 
 export async function login(_prev: LoginState | undefined, formData: FormData): Promise<LoginState> {
-  const password = String(formData.get("password") ?? "");
-  const requestedInit = String(formData.get("initialization") ?? "");
-  if (requestedInit === "schema" || requestedInit === "admin") {
-    return initialize(await getDb(), requestedInit, password);
+  if (await isOverrideLocked()) {
+    return { error: "服务处于密码重置锁定状态，请移除 ADMIN_OVERRIDE_PASSWORD 并重新部署/重启" };
   }
+  const password = String(formData.get("password") ?? "");
 
   const store = await cookies();
   const challenge = await verifyTotpChallenge(store.get(TOTP_CHALLENGE_COOKIE)?.value);
@@ -66,11 +67,31 @@ export async function login(_prev: LoginState | undefined, formData: FormData): 
         await clearAuthCookies();
         return { error: "数据库需要初始化，请重新输入初始密码" };
       }
-      return { error: (err as Error).message, requiresTotp: true };
+      const message = (err as Error).message;
+      const attempts = challenge.attempts + 1;
+      if (attempts >= TOTP_CHALLENGE_MAX_ATTEMPTS || message.includes("重新输入密码")) {
+        await clearAuthCookies();
+        return { error: attempts >= TOTP_CHALLENGE_MAX_ATTEMPTS ? "验证码失败次数过多，请重新输入密码" : message };
+      }
+      await setTotpChallengeCookie(challenge.authVersion, attempts);
+      return {
+        error: `${message}（剩余 ${TOTP_CHALLENGE_MAX_ATTEMPTS - attempts} 次尝试）`,
+        requiresTotp: true,
+      };
     }
     redirect("/");
   }
   if (token) return { error: "登录验证已过期，请重新输入密码" };
+
+  if (formData.has("password")) {
+    const turnstileError = await verifyTurnstile(String(formData.get("cf-turnstile-response") ?? ""));
+    if (turnstileError) return { error: turnstileError };
+  }
+
+  const requestedInit = String(formData.get("initialization") ?? "");
+  if (requestedInit === "schema" || requestedInit === "admin") {
+    return initialize(await getDb(), requestedInit, password);
+  }
 
   let auth: AdminAuth | null;
   try {

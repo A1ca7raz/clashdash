@@ -5,6 +5,7 @@ import { jwtVerify } from "jose/jwt/verify";
 export const SESSION_COOKIE = "clashdash_session";
 export const TOTP_CHALLENGE_COOKIE = "clashdash_totp_challenge";
 export const TOTP_CHALLENGE_MAX_AGE = 60 * 5;
+export const TOTP_CHALLENGE_MAX_ATTEMPTS = 5;
 
 const DEFAULT_SESSION_MAX_AGE = 60 * 60 * 24;
 
@@ -18,6 +19,10 @@ export function sessionMaxAge(): number {
 
 export interface SessionPayload {
   authVersion: number;
+}
+
+export interface TotpChallengePayload extends SessionPayload {
+  attempts: number;
 }
 
 function secret(): Uint8Array {
@@ -45,8 +50,8 @@ export async function verifySessionToken(token: string | undefined): Promise<Ses
   }
 }
 
-export function createTotpChallenge(authVersion: number): Promise<string> {
-  return new SignJWT({ sub: "admin", typ: "totp-challenge", ver: authVersion })
+export function createTotpChallenge(authVersion: number, attempts = 0): Promise<string> {
+  return new SignJWT({ sub: "admin", typ: "totp-challenge", ver: authVersion, att: attempts })
     .setProtectedHeader({ alg: "HS256" })
     .setJti(crypto.randomUUID())
     .setIssuedAt()
@@ -54,12 +59,12 @@ export function createTotpChallenge(authVersion: number): Promise<string> {
     .sign(secret());
 }
 
-export async function verifyTotpChallenge(token: string | undefined): Promise<SessionPayload | null> {
+export async function verifyTotpChallenge(token: string | undefined): Promise<TotpChallengePayload | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secret(), { algorithms: ["HS256"] });
     if (payload.sub !== "admin" || payload.typ !== "totp-challenge" || typeof payload.ver !== "number") return null;
-    return { authVersion: payload.ver };
+    return { authVersion: payload.ver, attempts: typeof payload.att === "number" ? payload.att : 0 };
   } catch {
     return null;
   }

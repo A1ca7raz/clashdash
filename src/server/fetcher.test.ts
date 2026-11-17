@@ -4,6 +4,11 @@ import { createDb } from "@/db/client";
 import { nodes, subscriptions } from "@/db/schema";
 import { refreshSubscription } from "./fetcher";
 
+// safe-fetch resolves hostnames before connecting; tests use a fixed public address.
+vi.mock("node:dns/promises", () => ({
+  lookup: vi.fn(async () => [{ address: "93.184.216.34", family: 4 }]),
+}));
+
 afterEach(() => vi.unstubAllGlobals());
 
 async function setup() {

@@ -38,10 +38,10 @@ export async function setSessionCookie(authVersion: number) {
   store.delete(TOTP_CHALLENGE_COOKIE);
 }
 
-export async function setTotpChallengeCookie(authVersion: number) {
+export async function setTotpChallengeCookie(authVersion: number, attempts = 0) {
   const store = await cookies();
   store.delete(SESSION_COOKIE);
-  store.set(TOTP_CHALLENGE_COOKIE, await createTotpChallenge(authVersion), {
+  store.set(TOTP_CHALLENGE_COOKIE, await createTotpChallenge(authVersion, attempts), {
     ...cookieOptions,
     maxAge: TOTP_CHALLENGE_MAX_AGE,
   });

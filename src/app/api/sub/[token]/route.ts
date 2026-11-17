@@ -2,12 +2,16 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { isDatabaseInitializationRequired } from "@/db/errors";
 import { profiles } from "@/db/schema";
+import { isOverrideLocked } from "@/server/override-lock";
 import { aggregateUserInfo, generateForProfile } from "@/server/profile-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ token: string }> }) {
+  if (await isOverrideLocked()) {
+    return Response.json({ error: "service locked: remove ADMIN_OVERRIDE_PASSWORD and redeploy" }, { status: 503 });
+  }
   try {
     const { token } = await params;
     const db = await getDb();

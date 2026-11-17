@@ -1,11 +1,15 @@
 import { getDb } from "@/db";
 import { requireAuth } from "@/server/auth";
 import { exportAll } from "@/server/backup";
+import { isOverrideLocked } from "@/server/override-lock";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  if (await isOverrideLocked()) {
+    return Response.json({ error: "service locked: remove ADMIN_OVERRIDE_PASSWORD and redeploy" }, { status: 503 });
+  }
   try {
     await requireAuth();
   } catch {

@@ -15,6 +15,13 @@
       "when": 1794931118532,
       "tag": "0001_profile_last_pulled_at",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794936776120,
+      "tag": "0002_override-reset-marker",
+      "breakpoints": true
     }
   ]
 }
