@@ -244,19 +244,27 @@ function NameDialog({
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
-        <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="名称（不含逗号和空白）" />
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            取消
-          </Button>
-          <Button disabled={!name.trim()} onClick={() => onSubmit(name.trim())}>
-            确定
-          </Button>
-        </DialogFooter>
+        <form
+          className="grid gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (name.trim()) onSubmit(name.trim());
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>{description}</DialogDescription>
+          </DialogHeader>
+          <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="名称（不含逗号和空白）" />
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              取消
+            </Button>
+            <Button type="submit" disabled={!name.trim()}>
+              确定
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
@@ -266,6 +274,8 @@ function BulkDialog({ subRule, onClose }: { subRule: string | null; onClose: () 
   const { profile } = useEditor();
   const [pending, run] = useRun();
   const [text, setText] = useState("");
+  const submit = () =>
+    run(() => bulkAddRules(profile.id, subRule, text), { success: (n) => `已导入 ${n} 条规则`, onOk: onClose });
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-2xl">
@@ -276,15 +286,23 @@ function BulkDialog({ subRule, onClose }: { subRule: string | null; onClose: () 
             列表；以 # 开头的行会被忽略。
           </DialogDescription>
         </DialogHeader>
-        <Textarea className="h-72 font-mono text-xs" value={text} onChange={(e) => setText(e.target.value)} />
+        <Textarea
+          className="h-72 font-mono text-xs"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.altKey && e.key === "Enter" && !e.nativeEvent.isComposing && !pending && text.trim()) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+        />
         <DialogFooter>
+          <p className="text-xs text-muted-foreground sm:mr-auto">按 Alt+Enter 导入</p>
           <Button variant="outline" onClick={onClose}>
             取消
           </Button>
-          <Button
-            disabled={pending || !text.trim()}
-            onClick={() => run(() => bulkAddRules(profile.id, subRule, text), { success: (n) => `已导入 ${n} 条规则`, onOk: onClose })}
-          >
+          <Button disabled={pending || !text.trim()} onClick={submit}>
             导入
           </Button>
         </DialogFooter>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Script from "next/script";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,8 @@ import { login } from "@/server/actions/auth";
 declare global {
   interface Window {
     turnstile?: { reset: () => void };
+    __turnstileCallback?: (token: string) => void;
+    __turnstileClear?: () => void;
   }
 }
 
@@ -27,12 +29,26 @@ export function LoginForm({
   turnstileSiteKey?: string | null;
 }) {
   const [state, action, pending] = useActionState(login, undefined);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const unavailable = !!databaseError || (!!initialization && !initialPasswordConfigured);
   const showTurnstile = !!turnstileSiteKey && !state?.requiresTotp;
 
+  // Implicit Turnstile rendering reports results through these global callbacks.
+  useEffect(() => {
+    window.__turnstileCallback = (token) => setTurnstileToken(token);
+    window.__turnstileClear = () => setTurnstileToken(null);
+    return () => {
+      delete window.__turnstileCallback;
+      delete window.__turnstileClear;
+    };
+  }, []);
+
   // A consumed Turnstile token cannot be reused; reset the widget after a failed submit.
   useEffect(() => {
-    if (state?.error && showTurnstile) window.turnstile?.reset();
+    if (state?.error && showTurnstile) {
+      window.turnstile?.reset();
+      setTurnstileToken(null);
+    }
   }, [state?.error, showTurnstile]);
 
   return (
@@ -95,9 +111,18 @@ export function LoginForm({
               />
             </div>
           )}
-          {showTurnstile && <div className="cf-turnstile" data-sitekey={turnstileSiteKey} data-action="login" />}
+          {showTurnstile && (
+            <div
+              className="cf-turnstile"
+              data-sitekey={turnstileSiteKey}
+              data-action="login"
+              data-callback="__turnstileCallback"
+              data-expired-callback="__turnstileClear"
+              data-error-callback="__turnstileClear"
+            />
+          )}
           {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
-          <Button type="submit" disabled={pending || unavailable}>
+          <Button type="submit" disabled={pending || unavailable || (showTurnstile && !turnstileToken)}>
             {pending ? (initialization ? "初始化中…" : "登录中…") : state?.requiresTotp ? "验证并登录" : initialization ? "初始化并登录" : "登录"}
           </Button>
         </form>

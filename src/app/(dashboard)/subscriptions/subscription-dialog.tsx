@@ -92,12 +92,21 @@ export function SubscriptionDialog({
   const canPreview = form.mode === "inline" || !!parsed.config;
   const processing = form.mode === "provider" ? (parsed.config?.processing ?? form.processing) : form.processing;
 
+  const canSubmit = !pending && (form.mode !== "provider" || !!parsed.config);
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>{subscription ? `编辑订阅「${subscription.name}」` : "添加订阅"}</DialogTitle>
-        </DialogHeader>
+        <form
+          className="grid gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (canSubmit) submit();
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>{subscription ? `编辑订阅「${subscription.name}」` : "添加订阅"}</DialogTitle>
+          </DialogHeader>
 
         <div className="grid gap-4">
           <div className="grid gap-1.5">
@@ -115,7 +124,7 @@ export function SubscriptionDialog({
 
           {form.mode === "provider" ? (
             <div className="grid gap-2">
-              <YamlEditor value={text} onChange={setText} height="440px" />
+              <YamlEditor value={text} onChange={setText} height="440px" onSubmit={() => canSubmit && submit()} />
               {!parsed.config && <p className="text-xs text-destructive">{parsed.error}</p>}
             </div>
           ) : (
@@ -176,14 +185,16 @@ export function SubscriptionDialog({
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            取消
-          </Button>
-          <Button onClick={submit} disabled={pending || (form.mode === "provider" && !parsed.config)}>
-            {pending ? "保存中…" : "保存"}
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            {form.mode === "provider" && <p className="text-xs text-muted-foreground sm:mr-auto">按 Alt+Enter 保存</p>}
+            <Button type="button" variant="outline" onClick={onClose}>
+              取消
+            </Button>
+            <Button type="submit" disabled={!canSubmit}>
+              {pending ? "保存中…" : "保存"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

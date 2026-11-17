@@ -153,8 +153,22 @@ function ImportDialog({ onClose }: { onClose: () => void }) {
             每行一个分享链接（ss / ssr / vmess / vless / trojan / hysteria2 / tuic / wireguard / anytls），或粘贴包含 proxies 的 Clash YAML、Base64 订阅内容。
           </DialogDescription>
         </DialogHeader>
-        <Textarea className="h-64 font-mono text-xs" value={text} onChange={(e) => setText(e.target.value)} />
+        <Textarea
+          className="h-64 font-mono text-xs"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.altKey && e.key === "Enter" && !e.nativeEvent.isComposing && !pending && text.trim()) {
+              e.preventDefault();
+              run(() => importManualNodes(text), {
+                success: (r) => `已导入 ${r.added} 个节点${r.errors.length ? `，${r.errors.length} 行无法解析` : ""}`,
+                onOk: onClose,
+              });
+            }
+          }}
+        />
         <DialogFooter>
+          <p className="text-xs text-muted-foreground sm:mr-auto">按 Alt+Enter 导入</p>
           <Button variant="outline" onClick={onClose}>
             取消
           </Button>
@@ -215,8 +229,9 @@ function NodeDialog({
           <DialogTitle>{node ? `编辑节点「${node.name}」` : "添加节点"}</DialogTitle>
           <DialogDescription>mihomo 节点配置（YAML）。</DialogDescription>
         </DialogHeader>
-        <YamlEditor value={text} onChange={setText} height="360px" />
+        <YamlEditor value={text} onChange={setText} height="360px" onSubmit={() => !pending && submit()} />
         <DialogFooter>
+          <p className="text-xs text-muted-foreground sm:mr-auto">按 Alt+Enter 保存</p>
           <Button variant="outline" onClick={onClose}>
             取消
           </Button>

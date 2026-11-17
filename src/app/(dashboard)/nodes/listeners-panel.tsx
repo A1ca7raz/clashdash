@@ -158,8 +158,9 @@ function ListenerDialog({
           <DialogTitle>{listener ? `编辑监听器「${listener.name}」` : "添加监听器"}</DialogTitle>
           <DialogDescription>使用 mihomo 原生监听器字段；rule 表示子规则，其他扩展字段会直接保留。</DialogDescription>
         </DialogHeader>
-        <YamlEditor value={text} onChange={setText} height="420px" />
+        <YamlEditor value={text} onChange={setText} height="420px" onSubmit={() => !pending && submit()} />
         <DialogFooter>
+          <p className="text-xs text-muted-foreground sm:mr-auto">按 Alt+Enter 保存</p>
           <Button variant="outline" onClick={onClose}>
             取消
           </Button>

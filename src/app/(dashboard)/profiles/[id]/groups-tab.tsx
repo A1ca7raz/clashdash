@@ -44,17 +44,14 @@ export function GroupsTab() {
       ) : (
         <SortableList
           items={groups}
+          className="overflow-hidden rounded-lg border"
           onReorder={(ids) => run(() => reorder("groups", profile.id, ids))}
           renderItem={(g) => (
             <div className="flex items-center gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{g.name}</span>
-                  <Badge variant="secondary">{g.type}</Badge>
-                  {g.options.hidden && <Badge variant="outline">hidden</Badge>}
-                </div>
-                <div className="truncate text-xs text-muted-foreground">{summary(g)}</div>
-              </div>
+              <span className="shrink-0 font-medium">{g.name}</span>
+              <Badge variant="secondary">{g.type}</Badge>
+              {g.options.hidden && <Badge variant="outline">hidden</Badge>}
+              <div className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{summary(g)}</div>
               <Button variant="ghost" size="icon-sm" onClick={() => setEditing(g)}>
                 <PencilIcon />
               </Button>

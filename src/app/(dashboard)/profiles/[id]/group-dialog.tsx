@@ -66,7 +66,7 @@ export function GroupDialog({ group, onClose }: { group: ProxyGroup | null; onCl
           <DialogDescription>代理组配置（YAML）。指定订阅来源时使用订阅名称，数组成员按顺序输出。</DialogDescription>
         </DialogHeader>
 
-        <YamlEditor value={text} onChange={setText} height="420px" />
+        <YamlEditor value={text} onChange={setText} height="420px" onSubmit={() => !(pending || "error" in parsed) && submit()} />
 
         <div className="rounded-lg bg-muted/50 p-3 text-xs">
           {"error" in preview ? (
@@ -88,6 +88,7 @@ export function GroupDialog({ group, onClose }: { group: ProxyGroup | null; onCl
         </div>
 
         <DialogFooter>
+          <p className="text-xs text-muted-foreground sm:mr-auto">按 Alt+Enter 保存</p>
           <Button variant="outline" onClick={onClose}>
             取消
           </Button>

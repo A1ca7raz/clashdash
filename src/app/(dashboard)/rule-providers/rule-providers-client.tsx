@@ -154,8 +154,9 @@ function ProviderDialog({
             使用 mihomo 原生 rule-provider 字段；inline 类型通过 payload 编写规则。{provider ? "改名会同步更新所有引用它的规则。" : ""}
           </DialogDescription>
         </DialogHeader>
-        <YamlEditor value={text} onChange={setText} height="420px" />
+        <YamlEditor value={text} onChange={setText} height="420px" onSubmit={() => !pending && submit()} />
         <DialogFooter>
+          <p className="text-xs text-muted-foreground sm:mr-auto">按 Alt+Enter 保存</p>
           <Button variant="outline" onClick={onClose}>
             取消
           </Button>

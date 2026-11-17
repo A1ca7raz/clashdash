@@ -107,56 +107,64 @@ function PointerDialog({ pointer, onClose }: { pointer: Pointer | null; onClose:
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{pointer ? `编辑密码指针「${pointer.name}」` : "添加密码指针"}</DialogTitle>
-          <DialogDescription>
-            {pointer ? "名称固定不可修改，只能更新密码。" : "名称创建后不可修改，密码可跨配置方案共享。"}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-2">
-          <Label htmlFor="pointer-name">名称</Label>
-          <Input
-            id="pointer-name"
-            value={name}
-            readOnly={!!pointer}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="shared-password"
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="pointer-value">密码</Label>
-          <div className="relative flex items-center">
+        <form
+          className="grid gap-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!pending) submit();
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>{pointer ? `编辑密码指针「${pointer.name}」` : "添加密码指针"}</DialogTitle>
+            <DialogDescription>
+              {pointer ? "名称固定不可修改，只能更新密码。" : "名称创建后不可修改，密码可跨配置方案共享。"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <Label htmlFor="pointer-name">名称</Label>
             <Input
-              id="pointer-value"
-              type={visible ? "text" : "password"}
-              value={value}
-              onChange={(event) => setValue(event.target.value)}
-              className="pr-9 font-mono"
-              autoComplete="off"
-              autoCapitalize="none"
-              spellCheck={false}
+              id="pointer-name"
+              value={name}
+              readOnly={!!pointer}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="shared-password"
             />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="absolute top-0.5 right-0.5"
-              title={visible ? "隐藏密码" : "显示密码"}
-              aria-label={visible ? "隐藏密码" : "显示密码"}
-              onClick={() => setVisible((current) => !current)}
-            >
-              {visible ? <EyeOffIcon /> : <EyeIcon />}
-            </Button>
           </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            取消
-          </Button>
-          <Button disabled={pending} onClick={submit}>
-            保存
-          </Button>
-        </DialogFooter>
+          <div className="grid gap-2">
+            <Label htmlFor="pointer-value">密码</Label>
+            <div className="relative flex items-center">
+              <Input
+                id="pointer-value"
+                type={visible ? "text" : "password"}
+                value={value}
+                onChange={(event) => setValue(event.target.value)}
+                className="pr-9 font-mono"
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="absolute top-0.5 right-0.5"
+                title={visible ? "隐藏密码" : "显示密码"}
+                aria-label={visible ? "隐藏密码" : "显示密码"}
+                onClick={() => setVisible((current) => !current)}
+              >
+                {visible ? <EyeOffIcon /> : <EyeIcon />}
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              取消
+            </Button>
+            <Button type="submit" disabled={pending}>
+              保存
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

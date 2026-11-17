@@ -56,7 +56,7 @@ export function PreviewTable({
             <span className="text-muted-foreground">按当前设置预览处理结果</span>
           )}
         </div>
-        <Button variant="outline" size="sm" onClick={load} disabled={pending}>
+        <Button type="button" variant="outline" size="sm" onClick={load} disabled={pending}>
           {pending ? "加载中…" : data ? "重新预览" : "预览"}
         </Button>
       </div>

@@ -172,27 +172,34 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
-        <DialogHeader>
-          <DialogTitle>新建配置方案</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-4">
-          <div className="grid gap-1.5">
-            <Label>名称</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        <form
+          className="grid gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!pending && name.trim()) {
+              run(() => createProfile({ name }), { onOk: (id) => router.push(`/profiles/${id}`) });
+            }
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>新建配置方案</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="grid gap-1.5">
+              <Label>名称</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+            </div>
+            <p className="text-xs text-muted-foreground">新方案默认选用全部订阅，可在编辑页调整。</p>
           </div>
-          <p className="text-xs text-muted-foreground">新方案默认选用全部订阅，可在编辑页调整。</p>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            取消
-          </Button>
-          <Button
-            disabled={pending || !name.trim()}
-            onClick={() => run(() => createProfile({ name }), { onOk: (id) => router.push(`/profiles/${id}`) })}
-          >
-            创建
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              取消
+            </Button>
+            <Button type="submit" disabled={pending || !name.trim()}>
+              创建
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
