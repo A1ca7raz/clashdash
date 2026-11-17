@@ -2,6 +2,7 @@
 
 import { ClipboardPasteIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
+import { BatchManagementControls, BatchSelectionCheckbox, useBatchManagement } from "@/components/batch-management";
 import { ConfirmButton } from "@/components/confirm-button";
 import { SortableList } from "@/components/sortable-list";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import {
   bulkAddRules,
   createSubRule,
   deleteRule,
+  deleteRules,
   deleteSubRule,
   renameSubRuleAction,
   reorder,
@@ -44,10 +46,16 @@ export function RulesTab() {
   const activeSet = current && subRuleNames.includes(current) ? current : null;
   const list = rules.filter((r) => (r.subRule ?? null) === activeSet);
   const ruleNumbers = new Map(list.filter((r) => r.type !== DIVIDER_RULE_TYPE).map((r, index) => [r.id, index + 1]));
+  const batch = useBatchManagement(list.map((rule) => rule.id));
 
   const add = () =>
     run(() => saveRule({ profileId: profile.id, subRule: activeSet, ...draft, enabled: true }), {
       onOk: () => setDraft({ ...EMPTY_RULE, type: draft.type, target: draft.target }),
+    });
+  const remove = () =>
+    run(() => deleteRules(profile.id, activeSet, [...batch.selectedIds]), {
+      success: (count) => `已删除 ${count} 条规则`,
+      onOk: batch.clear,
     });
 
   return (
@@ -104,15 +112,30 @@ export function RulesTab() {
         </div>
       </div>
 
+      <div>
+        <BatchManagementControls
+          batch={batch}
+          totalCount={list.length}
+          pending={pending}
+          deleteDescription="将删除当前规则集合中所选的规则或分隔线，剩余规则顺序不变。"
+          onDelete={remove}
+        />
+      </div>
       {list.length === 0 ? (
         <div className="py-8 text-sm text-muted-foreground">没有规则</div>
       ) : (
         <SortableList
           items={list}
-          className="rounded-lg border"
+          className="overflow-hidden rounded-lg border"
           onReorder={(ids) => run(() => reorder("rules", profile.id, ids))}
           renderItem={(r) => (
             <div className={`flex items-center gap-3 ${r.enabled || r.type === DIVIDER_RULE_TYPE ? "" : "opacity-50"}`}>
+              <BatchSelectionCheckbox
+                label={`选择规则「${ruleDescription(r)}」`}
+                checked={batch.selectedIds.has(r.id)}
+                disabled={pending}
+                onToggle={() => batch.toggle(r.id)}
+              />
               {r.type !== DIVIDER_RULE_TYPE && (
                 <span className="w-8 text-right text-xs text-muted-foreground tabular-nums">{ruleNumbers.get(r.id)}</span>
               )}

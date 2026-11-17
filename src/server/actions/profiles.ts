@@ -390,6 +390,20 @@ export async function deleteRule(id: number) {
   });
 }
 
+const ruleIdsSchema = z.array(z.number().int()).min(1).transform((ids) => [...new Set(ids)]);
+
+export async function deleteRules(profileId: number, subRule: string | null, ids: number[]) {
+  return run(async (db) => {
+    const uniqueIds = ruleIdsSchema.parse(ids);
+    const deleted = await db
+      .delete(rules)
+      .where(and(inSet(profileId, subRule), inArray(rules.id, uniqueIds)))
+      .returning({ id: rules.id });
+    done();
+    return deleted.length;
+  });
+}
+
 export async function bulkAddRules(profileId: number, subRule: string | null, text: string) {
   return run(async (db) => {
     const { rules: parsed, errors } = parseRuleLines(text);

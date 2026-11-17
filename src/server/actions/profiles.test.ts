@@ -15,7 +15,7 @@ import {
   subscriptions,
 } from "@/db/schema";
 import { createDb } from "@/db/client";
-import { deleteProfiles, duplicateProfile, saveGroup, saveRule } from "./profiles";
+import { deleteProfiles, deleteRules, duplicateProfile, saveGroup, saveRule } from "./profiles";
 
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("@/server/auth", () => ({ requireAuth: async () => {} }));
@@ -164,6 +164,43 @@ describe("saveRule", () => {
       ["DIVIDER", "tail", "", 1],
       ["MATCH", "", "REJECT", 2],
     ]);
+  });
+});
+
+describe("deleteRules", () => {
+  it("deletes only selected rules in the current profile and rule set", async () => {
+    const [otherProfile] = await db.insert(profiles).values({ name: "Other", token: "other" }).returning();
+    const inserted = await db
+      .insert(rules)
+      .values([
+        { profileId, type: "DOMAIN", payload: "a.example", target: "DIRECT", sort: 0 },
+        { profileId, type: "DIVIDER", payload: "国内流量", target: "", sort: 1 },
+        { profileId, subRule: "work", type: "DOMAIN", payload: "work.example", target: "DIRECT", sort: 0 },
+        { profileId: otherProfile.id, type: "DOMAIN", payload: "other.example", target: "DIRECT", sort: 0 },
+      ])
+      .returning();
+
+    expect(
+      await deleteRules(profileId, null, [inserted[0].id, inserted[0].id, inserted[1].id, inserted[2].id, inserted[3].id, 999]),
+    ).toEqual({ ok: true, data: 2 });
+    const remaining = await db.select().from(rules).orderBy(asc(rules.id));
+    expect(remaining.map((row) => row.id)).toEqual([inserted[2].id, inserted[3].id]);
+  });
+
+  it("deletes rows from the selected sub-rule and rejects invalid id arrays", async () => {
+    const inserted = await db
+      .insert(rules)
+      .values([
+        { profileId, type: "MATCH", payload: "", target: "DIRECT", sort: 0 },
+        { profileId, subRule: "work", type: "MATCH", payload: "", target: "DIRECT", sort: 0 },
+      ])
+      .returning();
+
+    expect(await deleteRules(profileId, "work", [inserted[1].id])).toEqual({ ok: true, data: 1 });
+    expect((await db.select().from(rules)).map((row) => row.id)).toEqual([inserted[0].id]);
+    expect((await deleteRules(profileId, null, [])).ok).toBe(false);
+    expect((await deleteRules(profileId, null, [inserted[0].id, 1.5])).ok).toBe(false);
+    expect(await db.$count(rules)).toBe(1);
   });
 });
 
