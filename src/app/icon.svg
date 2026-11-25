@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="896 894 208 112">
+  <title>Cyber aurora favicon</title>
+  <defs>
+    <linearGradient id="cyberAurora" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#00D9F5"/>
+      <stop offset="50%" stop-color="#8A2BE2"/>
+      <stop offset="100%" stop-color="#F4A261"/>
+    </linearGradient>
+    <path id="auroraPath" d="M 911.65 982.83 A 90 90 0 0 1 944.16 919.42 Q 949.02 915.83 952.41 920.83 L 973.64 962.19 Q 977.06 967.23 982.3 972.83 A 40 40 0 0 1 1017.7 972.83 Q 1022.94 967.23 1026.36 962.19 L 1047.59 920.83 Q 1050.98 915.83 1055.84 919.42 A 90 90 0 0 1 1088.35 982.83"/>
+  </defs>
+  <use href="#auroraPath" fill="none" stroke="url(#cyberAurora)" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

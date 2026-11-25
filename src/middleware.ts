@@ -15,5 +15,5 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   // Public: login page, client subscription endpoint, cron endpoint (own secret), static assets.
-  matcher: ["/((?!login|api/sub/|api/cron/|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!login|api/sub/|api/cron/|_next/static|_next/image|favicon.ico|icon.svg).*)"],
 };
