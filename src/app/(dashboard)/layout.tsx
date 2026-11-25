@@ -1,5 +1,6 @@
 import { LogOutIcon } from "lucide-react";
 import { redirect } from "next/navigation";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/server/actions/auth";
 import { requireAuth } from "@/server/auth";
@@ -21,12 +22,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <div className="text-xs text-muted-foreground">mihomo 配置管理</div>
         </div>
         <Nav />
-        <form action={logout} className="mt-auto">
-          <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground" type="submit">
-            <LogOutIcon />
-            退出登录
-          </Button>
-        </form>
+        <div className="mt-auto flex items-center gap-1">
+          <form action={logout} className="flex-1">
+            <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground" type="submit">
+              <LogOutIcon />
+              退出登录
+            </Button>
+          </form>
+          <ThemeToggle />
+        </div>
       </aside>
       <main className="min-w-0 flex-1 p-6">{children}</main>
     </div>

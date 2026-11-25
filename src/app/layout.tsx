@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ThemeProvider } from "next-themes";
 import { OverrideLockedNotice } from "@/components/override-locked";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,10 +18,12 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const locked = await isOverrideLocked();
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <TooltipProvider>{locked ? <OverrideLockedNotice /> : children}</TooltipProvider>
-        <Toaster position="top-center" richColors />
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <TooltipProvider>{locked ? <OverrideLockedNotice /> : children}</TooltipProvider>
+          <Toaster position="top-center" richColors />
+        </ThemeProvider>
       </body>
     </html>
   );
